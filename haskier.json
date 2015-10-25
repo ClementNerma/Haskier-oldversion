@@ -1,4 +1,6 @@
 {
+    "version": "3",
+
     "history": {
         "_init": {
             "actions": [
@@ -16,12 +18,12 @@
                 "Communication entrante...",
                 "Ouverture du réseau...",
                 "{b_red,f_white: - Bloqué par le pare-feu - }",
-                "Veuillez désactiver le pare-feu\nPour plus d\"informations, tapez <{f_cyan:help firewall}>"
+                "Veuillez désactiver le pare-feu\nPour plus d'informations, tapez <{f_cyan:help firewall}>"
             ],
             "todo": [
                 {
                     "type": "afterCommand",
-                    "content": "states.firewall === false"
+                    "content": "server.state('firewall') === false"
                 }
             ]
         },
@@ -60,7 +62,7 @@
                 {"type": "taken", "name": "K", "wait": 10000},
                 "K : Mes supérieurs sont prêts à vous prendre à l'essai",
                 "K : Je vous laisse vous préparer. Rouvrez la communication lorsque vous serez prêts",
-                {"type": "command", "content": "com close"}
+                {"command": "com close"}
             ],
             "todo": [
                 "open-communication-port"
@@ -74,7 +76,7 @@
                 "K : Son adresse IP est {italic:127.2.5.364}. Il ne dispose d'aucune sécurité particulière, ce devrait être un vrai jeu d'enfant pour vous, n'est-ce pas ?",
                 "K : Lorsque vous aurez trouvé, rouvrez le port communication et donnez-moi le code",
                 "K : À tout de suite",
-                {"type": "command", "content": "com close"}
+                {"command": "com close"}
             ],
 
             "todo": [
@@ -90,9 +92,15 @@
                 "identifier": "$master",
                 "password": "m@st€rP@ssw0rd"
             },
-            "files": {},
+            "files": {
+                "documents": {
+                    "mot de passe.txt": "Le mot de passe de l'ordinateur est :\nm@st€rP@ssw0rd"
+                },
+                ".sys": { ".log": "[]" }
+            },
             "apps": ["browser", "app", "format"],
-            "os": "Century"
+            "os": "Century",
+            "filesTable": []
         },
 
         "127.2.5.364": {
@@ -103,10 +111,12 @@
                 "password"  : "for-hacking-test"
             },
             "files": {
-                "code.txt": "Donnez ce code à K pour valider l'épreuve : 5479"
+                "code.txt": "Donnez ce code à K pour valider l'épreuve : 5479",
+                ".sys": { ".log": "[]" }
             },
             "apps":  [],
-            "os": "anonym0s"
+            "os": "anonym0s",
+            "filesTable": []
         },
 
         "824.54.63.772.5": {
@@ -115,9 +125,12 @@
                 "ddos": true,
                 "multitries-IP": 10
             },
-            "files": {},
+            "files": {
+                ".sys": { ".log": "[]" }
+            },
             "apps": ["aes-server"],
-            "os": "anonym0s-security"
+            "os": "anonym0s-security",
+            "filesTable": []
         }
     },
 
@@ -129,7 +142,7 @@
     "todoModels": {
         "open-communication-port": {
             "type": "afterCommand",
-            "content": "states.communicationOpened === true"
+            "content": "server.state('communicationOpened') === true"
         }
     }
 }

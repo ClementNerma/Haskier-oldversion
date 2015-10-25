@@ -10,7 +10,7 @@
   *     - Custom hero name !
   */
 
-var version = '0.2.0.3a', normalSpeed = 1;
+var version = '0.2.0.4a', normalSpeed = 1;
 
 try {
     var game = JSON.parse($.ajax({
@@ -55,7 +55,7 @@ $('#go_fullscreen').click(function() {
 function instantServerConnect(IP) {
     vars.connected        = IP;
     vars.connectedLogged  = false;
-    server                = servers[IP];
+    server                = new Server(servers[IP]);
     states                = server.states;
 }
 
@@ -103,7 +103,10 @@ function command(command) {
     if(err)
         return display(err);
 
-    cmd.core.apply(window, args);
+    var err = cmd.core.apply(window, args);
+
+    if(typeof err === 'string')
+        return display('{f_red:' + err + '}');
 
     saveGame();
 
@@ -149,10 +152,10 @@ var commands = {
 
         core: function(state) {
             if(state === 'open') {
-                states.communicationOpened = true
+                server.state('communicationOpened', true);
                 display('Port communication {f_cyan:ouvert}');
             } else if(state === 'close') {
-                states.communicationOpened = false;
+                server.state('communicationOpened', false);
                 display('Port communication {f_cyan:fermé}');
             }
         }
@@ -173,10 +176,10 @@ var commands = {
 
         core: function(state) {
             if(state === 'enable') {
-                states.firewall = true
+                sever.state('firewall', true);
                 display('Pare-feu {f_cyan:activé}');
             } else if(state === 'disable') {
-                states.firewall = false;
+                server.state('firewall', false);
                 display('Pare-feu {f_cyan:désactivé}');
             }
         }
@@ -208,39 +211,66 @@ var commands = {
                 name  : 'IP',
                 legend: 'Adresse IP du serveur distant',
                 verif : function(IP) {
-                    if(!IP.match(/^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$/))
-                        return 'Cette adresse IP n\'est pas valide. Une adresse IP doit être constituée de la forme suivant : {b_white,f_black:x.x.x.x} où {b_white,f_black:x} désigne un à trois chiffres';
+                    if(!IP.match(/^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$/)) {
+                        this.error = 'Cette adresse IP n\'est pas valide. Une adresse IP doit être constituée de la forme suivant : {b_white,f_black:x.x.x.x} où {b_white,f_black:x} désigne un à trois chiffres';
+                        return false;
+                    }
 
                     if(!game.servers.hasOwnProperty(IP)) {
+                        display('Connexion au serveur distant...');
                         sleep(5000);
-                        return 'Impossible de trouver le serveur associé à cette adresse IP';
+                        this.error = 'Impossible de trouver le serveur associé à cette adresse IP';
+                        return false;
                     }
 
                     return true;
                 },
                 required: true
+            },
+            {
+                helpHide: true
             }
         ],
 
-        core: function(IP) {
+        core: function(IP, instant) {
             connectingIP = IP;
-            send([
-                'Connexion au serveur distant...',
-                {type: 'wait', content: 5000},
-                'Résolution du nom d\'hôte...',
-                {type: 'wait', content: 3000},
-                'Résolution de l\'adresse...',
-                {type: 'wait', content: 3000},
-                'Authentification SSH...',
-                {type: 'wait', content: 7000},
-                'Validation du certificat SSH..',
-                {type: 'wait', content: 3000},
-                'Connexion réussie !\nRécupération des informations serveur...',
-                {type: 'wait', content: 5000},
-                '{italic:Connecté au serveur distant : ' + connectingIP + '}\n{italic:Toutes les commands que vous allez saisir seront exécutées sur le serveur distant.}',,
-                {type: 'js', content: 'instantServerConnect(connectingIP);'}
-                // ask for login and password
-            ]);
+
+            if(instant) {
+                instantServerConnect(connectingIP);
+                send(['Connecté au serveur {italic:' + connectingIP + '}']);
+            } else
+                send([
+                    'Connexion au serveur distant...',
+                    {type: 'wait', content: 5000},
+                    'Résolution du nom d\'hôte...',
+                    {type: 'wait', content: 3000},
+                    'Résolution de l\'adresse...',
+                    {type: 'wait', content: 3000},
+                    'Authentification SSH...',
+                    {type: 'wait', content: 7000},
+                    'Validation du certificat SSH..',
+                    {type: 'wait', content: 3000},
+                    'Connexion réussie !\nRécupération des informations serveur...',
+                    {type: 'wait', content: 5000},
+                    '{italic:Connecté au serveur distant : ' + connectingIP + '}\n{italic:Toutes les commandes que vous allez saisir seront exécutées sur le serveur distant.}',,
+                    {type: 'js', content: 'instantServerConnect(connectingIP);'}
+                    // ask for login and password
+                ]);
+        }
+    },
+
+    ls: {
+        legend: 'Liste les fichiers du serveur',
+
+        arguments: [
+            {
+                name  : 'directory',
+                legend: 'Dossier à lire, si omit, lit la racine du serveur'
+            }
+        ],
+
+        core: function(dir) {
+            // list files and dirs
         }
     },
 
@@ -267,7 +297,8 @@ var commands = {
                 help += '\n\n{f_cyan:' + list[i] + '}\n{italic:' + cmd.legend + '}';
 
                 for(var j = 0; j < args.length; j += 1) {
-                    help += '\n    {f_green:' + args[j].name + '} ' + args[j].legend;
+                    if(!args[j].helpHide)
+                        help += '\n    {f_green:' + args[j].name + '} ' + args[j].legend;
                 }
             }
 
@@ -281,9 +312,10 @@ var commands = {
 var term = $('#terminal').terminal(function(cmd, term) {
     command(cmd);
 }, {
-    greetings: '',
-    name: 'Haskier',
-    prompt: 'Shaun $ '
+    greetings  : '',
+    name       : 'Haskier',
+    prompt     : 'Shaun $ ',
+    completion : Object.keys(commands)
 });
 
 var queue = [];
@@ -332,26 +364,34 @@ function treatSending() {
         return ;
     }
 
-    var scheduleNext = true;
+    var scheduleNext = true, place = Object.keys(queue)[0], q = queue[place];
 
-    if(typeof queue[0] === 'string')
-        display(formatColor(queue[0]));
+    if(typeof q === 'string')
+        display(formatColor(q));
     else {
-        if(queue[0].type === 'file')
-            display('\nFichier : {f_cyan,italic:' + queue[0].filename + '}\n\n=================================\n' + '{italic:' + queue[0].content.split('\n').join('}\n{italic:') + '}\n=================================\n');
-        else if(queue[0].type === 'incoming-communication')
+        var keys = Object.keys(q);
+
+        if(keys.length === 1)
+            q = {
+                type: keys[0],
+                content: q[keys[0]]
+            };
+
+        if(q.type === 'file')
+            display('\nFichier : {f_cyan,italic:' + q.filename + '}\n\n=================================\n' + '{italic:' + q.content.split('\n').join('}\n{italic:') + '}\n=================================\n');
+        else if(q.type === 'incoming-communication')
             display('{f_darkgrey:=== Communication entrante ===}');
-        else if(queue[0].type === 'taken')
-            display('{italic:' + queue[0].name + ' est occuppé}');
-        else if(queue[0].type === 'command')
-            command(queue[0].content, true);
-        else if(queue[0].type === 'choice') {
+        else if(q.type === 'taken')
+            display('{italic:' + q.name + ' est occuppé}');
+        else if(q.type === 'command')
+            command(q.content, true);
+        else if(q.type === 'choice') {
             display('');
 
-            for(var i = 0; i < queue[0].answers.length; i += 1)
-                display('{bold:' + (i + 1) + '} : ' + queue[0].answers[i]);
+            for(var i = 0; i < q.answers.length; i += 1)
+                display('{bold:' + (i + 1) + '} : ' + q.answers[i]);
 
-            answersLength = queue[0].answers.length;
+            answersLength = q.answers.length;
             display('\nVotre choix ? [1-' + answersLength + ']\n');
 
             onBeforeCommand = function(cmd) {
@@ -369,7 +409,7 @@ function treatSending() {
 
             scheduleNext = false;
             term.resume();
-        } else if(queue[0].type === 'input') {
+        } else if(q.type === 'input') {
             display('');
 
             onBeforeCommand = function(cmd) {
@@ -385,8 +425,8 @@ function treatSending() {
         }
     }
 
-    var old = queue[0];
-    queue.splice(0, 1);
+    var old = q;
+    queue.splice(place, 1);
 
     if(!queue.length)
         term.resume();
@@ -394,6 +434,10 @@ function treatSending() {
         setTimeout(function() {
             treatSending();
         }, ((typeof old === 'string' || old.type === 'file') ? 500 + 50 * (old.length || old.content.length / 1.25) : (old.wait || 50 * old.length || 3000)) * normalSpeed);
+}
+
+function stopSending() {
+    queue = [];
 }
 
 function saveGame(afterPoint) {
@@ -410,6 +454,7 @@ function saveGame(afterPoint) {
         vars         : vars,
         version      : version,
         servers      : servers,
+        gameVersion  : game.version,
 
         didSomethingAfterSave: didSomethingAfterSave ? 1 : 0
     }));
@@ -440,8 +485,12 @@ if(save) {
     try {
         save = JSON.parse(save);
 
-        if(save.version !== version) {
-            console.warn('Save version is different of current game version (' + save.version + ' != ' + version + ')\nSave ignored. Created backup : localStorage.haskier_backup. Deleted current save.');
+        if(save.version !== version || save.gameVersion !== game.version) {
+            var next = 'Save ignored. Created backup : localStorage.haskier_backup. Deleted current save.';
+            if(save.version !== version)
+                console.warn('Save version is different of current engine version (' + save.version + ' != ' + version + ')\n' + next);
+            else
+                console.warn('Save game version is differont of current game version (' + save.gameVersion + ' != ' + game.version + ')\n' + next);
             localStorage.setItem('haskier_backup', localStorage.getItem('haskier'));
             localStorage.removeItem('haskier');
             save = {};
@@ -472,7 +521,7 @@ if(!progress) {
 for(var i in servers)
     servers[i].states = game.statesModel;
 
-var server = servers[vars.server], states = server.states;
+var server = new Server(servers[vars.server]);
 
 var historyPoint = save.historyPoint || '_init';
 var didSomethingAfterSave = save.didSomethingAfterSave || 0;
