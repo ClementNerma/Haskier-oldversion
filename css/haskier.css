@@ -1,0 +1,32 @@
+
+#terminal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+#terminal .terminal-output, #terminal .cmd {
+    font-size: 1.2em !important;
+}
+
+#terminal div {
+    margin-bottom: 2px;
+}
+
+#go_fullscreen {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 5px;
+
+    border: 1px solid darkgrey;
+    background-color: lightgrey;
+
+    cursor: pointer;
+}
+
+#go_fullscreen:hover {
+    background-color: darkgrey;
+}

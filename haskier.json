@@ -1,0 +1,135 @@
+{
+    "history": {
+        "_init": {
+            "actions": [
+                {"type": "wait", "content": 1500},
+                "{b_blue:Système} {italic:Quelqu'un cherche à vous joindre}",
+                "{b_blue:Système} {italic:Pour ouvrir la communication, tapez <}{f_cyan:com open}{italic:>}"
+            ],
+            "todo": [
+                "open-communication-port"
+            ]
+        },
+
+        "communication ouverte": {
+            "actions": [
+                "Communication entrante...",
+                "Ouverture du réseau...",
+                "{b_red,f_white: - Bloqué par le pare-feu - }",
+                "Veuillez désactiver le pare-feu\nPour plus d\"informations, tapez <{f_cyan:help firewall}>"
+            ],
+            "todo": [
+                {
+                    "type": "afterCommand",
+                    "content": "states.firewall === false"
+                }
+            ]
+        },
+
+        "désactiver pare-feu": {
+            "actions": [
+                "Veuillez patienter...",
+                "Réception de la communication...",
+                {"type": "incoming-communication"},
+                "??? : Bonsoir $name !",
+                "??? : Vous voyez qui je suis, n'est-ce pas ?",
+                "??? : C'est le chef qui m'envoie",
+                "??? : Vous avez réussi à hacker nos serveurs et moi votre ordinateur",
+                "??? : J'ai trouvé le fichier que vous aviez laissé sur notre serveur principal",
+                {
+                    "type": "file",
+                    "filename": "Messieurs.txt",
+                    "content": "Messieurs les hackers,\n\nJe me nomme $name, je suis étudiant à Paris et j'ai 17 ans.\nVous vous croyez les meilleurs ? Voici la preuve que non.\nJ'ai récupéré le fichier contenant la liste de vos membres.\nSi vous voulez des preuves, je vais vous en donner.\nMais si vous voulez que je passe sous silence vos activités, vous allez devoir répondre à mes attentes.\nVous pouvez me contacter par vous-même en retraçant mon adresse IP, n'est-ce pas ?\nJe vous attends.\n\n$name."
+                },
+                "??? : Ai-je besoin d'ajouter quelque chose ?",
+                "??? : Très bien. Appellez-moi {italic:K}",
+                "K : C'est moi qui suis chargé de la cellule d'enquête de notre organisation, {italic:Anonymas}",
+                "K : Je dois avouer que j'ai été surpris lorsque vous avez récupéré la liste des membres",
+                "K : Mais ceux qui ont été chargés de le sécuriser n'ont apparemment pas bien fait leur travail",
+                "K : Enfin, quoi qu'il en soit, vous disposez maintenant de la liste de nos effectifs, n'est-ce pas ?",
+                "K : Vous avez laissé suffisamment d'informations derrières vous pour que nous vous croyions",
+                "K : Maintenant, me voici",
+                "K : Que voulez-vous en échange de votre silence ?",
+                {
+                    "type": "choice",
+                    "answers": ["Une place dans votre organisation"]
+                },
+                "K : Une place dans notre organisation... ?",
+                "K : Très bien. Je vais voir ce que je peux faire",
+                "K : Attendez un peu",
+                {"type": "taken", "name": "K", "wait": 10000},
+                "K : Mes supérieurs sont prêts à vous prendre à l'essai",
+                "K : Je vous laisse vous préparer. Rouvrez la communication lorsque vous serez prêts",
+                {"type": "command", "content": "com close"}
+            ],
+            "todo": [
+                "open-communication-port"
+            ]
+        },
+
+        "prêt pour l'essai": {
+            "actions": [
+                "K : Voici l'épreuve",
+                "K : Vous devez, à l'aide des outils dont vous disposer sur votre ordinateur, réussir à récupérer le code qui se trouve sur notre serveur de test.",
+                "K : Son adresse IP est {italic:127.2.5.364}. Il ne dispose d'aucune sécurité particulière, ce devrait être un vrai jeu d'enfant pour vous, n'est-ce pas ?",
+                "K : Lorsque vous aurez trouvé, rouvrez le port communication et donnez-moi le code",
+                "K : À tout de suite",
+                {"type": "command", "content": "com close"}
+            ],
+
+            "todo": [
+                "open-communication-port"
+            ]
+        }
+    },
+
+    "servers": {
+        "__local": {
+            "description": "Ordinateur personnel de $name",
+            "login": {
+                "identifier": "$master",
+                "password": "m@st€rP@ssw0rd"
+            },
+            "files": {},
+            "apps": ["browser", "app", "format"],
+            "os": "Century"
+        },
+
+        "127.2.5.364": {
+            "description": "Serveur Anonymas pour test de sécurité",
+            "security_config": {},
+            "login": {
+                "identifier": "master",
+                "password"  : "for-hacking-test"
+            },
+            "files": {
+                "code.txt": "Donnez ce code à K pour valider l'épreuve : 5479"
+            },
+            "apps":  [],
+            "os": "anonym0s"
+        },
+
+        "824.54.63.772.5": {
+            "description": "Serveur maître Anonymas",
+            "security_config": {
+                "ddos": true,
+                "multitries-IP": 10
+            },
+            "files": {},
+            "apps": ["aes-server"],
+            "os": "anonym0s-security"
+        }
+    },
+
+    "statesModel": {
+        "firewall": true,
+        "communicationOpened": false
+    },
+
+    "todoModels": {
+        "open-communication-port": {
+            "type": "afterCommand",
+            "content": "states.communicationOpened === true"
+        }
+    }
+}
