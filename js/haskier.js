@@ -13,7 +13,7 @@
   *     - Fake SSH
   */
 
-var version = '0.2.0.5a', normalSpeed = 1, scenarioIf = true;
+var version = '0.3b', normalSpeed = 1, scenarioIf = true;
 
 try {
     var game = JSON.parse($.ajax({
@@ -87,7 +87,7 @@ function command(command) {
 
     if(!commands.hasOwnProperty(command)) {
         console.log(commands, command);
-        return display('{f_#FE1B00:La commande ' + command + ' n\'est pas disponible}');
+        return display('{f_#FE1B00:La commande ' + command + ' n\'est pas disponible ou n\'existe pas}');
     }
 
     var cmd = commands[command], cargs = commands[command].arguments, arg, err = false;
@@ -103,14 +103,16 @@ function command(command) {
             break;
         }
 
-        if(arg.regex && !arg.regex.test(args[i])) {
-            err = '{f_#FE1B00:' + arg.error + '}';
-            break;
-        }
+        if(typeof args[i] !== 'undefined') {
+            if(arg.regex && !arg.regex.test(args[i])) {
+                err = '{f_#FE1B00:' + arg.error + '}';
+                break;
+            }
 
-        if(arg.verif && !arg.verif(args[i])) {
-            err = '{f_#FE1B00:' + arg.error + '}';
-            break;
+            if(arg.verif && !arg.verif(args[i])) {
+                err = '{f_#FE1B00:' + arg.error + '}';
+                break;
+            }
         }
     }
 
@@ -190,7 +192,7 @@ var commands = {
 
         core: function(state) {
             if(state === 'enable') {
-                sever.state('firewall', true);
+                server.state('firewall', true);
                 display('Pare-feu {f_cyan:activé}');
             } else if(state === 'disable') {
                 server.state('firewall', false);
@@ -403,9 +405,9 @@ var commands = {
         arguments: [
             {
                 name  : 'command',
-                legend: 'Afficher le texte d\'aide d\'une commande',
+                legend: 'Afficher le texte d\'aide d\'une commande ou {f_cyan:--more} pour afficher la liste compressée des commandes',
                 verif : function(name) {
-                    return commands.hasOwnProperty(name);
+                    return commands.hasOwnProperty(name) || name === '--more';
                 },
                 error: 'Cette commande n\'existe pas'
             }
@@ -413,7 +415,23 @@ var commands = {
 
         core: function(name) {
 
-            var list = name ? [name] : Object.keys(commands), cmd, args, help = '';
+            var list = name && name !== '--more' ? [name] : Object.keys(commands).sort(), cmd, args, help = '';
+
+            if(name === '--more') {
+                var maxLength = 0;
+
+                for(var i = 0; i < list.length; i += 1) {
+                    if(list[i].length > maxLength)
+                        maxLength = list[i].length;
+                }
+
+                for(i = 0; i < list.length; i += 1) {
+                    cmd = commands[list[i]];
+                    display('{f_cyan:' + list[i] + '}' + ' '.repeat(maxLength - list[i].length) + ' ' + cmd.legend);
+                }
+
+                return ;
+            }
 
             for(var i = 0; i < list.length; i += 1) {
                 cmd = commands[list[i]]; args = cmd.arguments;
@@ -634,6 +652,8 @@ function treatSending() {
             queue        = [];
             queue[place] = 0;
             scheduleNext = false;
+        } else if(q.type === 'end-of-game' && scenarioIf) {
+            display('\n{f_cyan,italic:Vous avez terminé le jeu. Félicitations !}' + (version.substr(0, 2) === '0.' ? '\n{f_cyan,italic:Notez que ceci était une version Alpha du jeu et que le scénario n\'est, à ce titre, pas terminé.}' : '') + '\n{f_cyan,italic:Je vous remercie d\'avoir joué à ce jeu. N\'hésitez pas à le commenter sur mon compte twitter (@ClementNerma) afin que je puisse l\'améliorer. Merci !}');
         } else if(q.type !== 'wait' && scenarioIf) {
             display('{f_#FE1B00:Unknown scenario command. Open developper\'s console for more details.}');
             console.error(q);

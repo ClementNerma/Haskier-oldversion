@@ -28,7 +28,7 @@
             ]
         },
 
-        "désactiver pare-feu": {
+        "pare-feu désactivé": {
             "actions": [
                 "Veuillez patienter...",
                 "Réception de la communication...",
@@ -117,7 +117,8 @@
                 "K : Le fichier n'est pas correct.",
                 { "type": "game-over" },
                 { "type" : "end" },
-                "K : Vous avez réussi l'épreuve d'essai. Nul doute que vous avez à votre disposition d'excellents outils."
+                "K : Vous avez réussi l'épreuve d'essai. Nul doute que vous avez à votre disposition d'excellents outils.",
+                { "type": "end-of-game" }
             ],
 
             "todo": [
@@ -163,7 +164,7 @@
         },
 
         "127.32.48.53": {
-            "description": "Serveur Anonymas pour test de sécurity (2)",
+            "description": "Serveur Anonymas pour test de sécurité (2)",
             "security": ["certificate-verification", "geolocalisation"],
             "login": {
                 "identifier": "master",
@@ -196,7 +197,7 @@
             "/infos": "Réseau   : \"internet\"\nCryptage : Non\nFormat   : UTF-8",
             "/about": "Réseau \"internet\" créé par Macrosoft Corporation le 18 juin 1987. Toute utilisation frauduleuse peut faire l'objet de poursuites judiciaires.\nNous ne pouvons en aucun cas être tenus responsables d'éventuels problèmes liés à l'utilisation de ce réseau."
         },
-        "__local": {"commentaire":"Mettre ici un fichier contenant des informations pratiques pour accélérer le jeu. Crypter le tout en AES et rendre sa décryption difficile !"}
+            "__local": {"commentaire":"Mettre ici un fichier contenant des informations pratiques pour accélérer le jeu. Crypter le tout en AES et rendre sa décryption difficile !"}
     },
 
     "statesModel": {
