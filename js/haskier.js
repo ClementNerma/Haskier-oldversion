@@ -8,9 +8,12 @@
   *     - Support of color for jQuery Terminal
   *     - In french !!
   *     - Custom hero name !
+  *     - Support of multiple servers
+  *     - Filesystem commands
+  *     - Fake SSH
   */
 
-var version = '0.2.0.4a', normalSpeed = 1;
+var version = '0.2.0.5a', normalSpeed = 1, scenarioIf = true;
 
 try {
     var game = JSON.parse($.ajax({
@@ -53,10 +56,15 @@ $('#go_fullscreen').click(function() {
 });
 
 function instantServerConnect(IP) {
-    vars.connected        = IP;
-    vars.connectedLogged  = false;
+    vars.server           = IP;
+    //vars.connectedLogged  = false;
     server                = new Server(servers[IP]);
     states                = server.states;
+    saveGame();
+}
+
+function updatePrompt() {
+    term.set_prompt('[[;#00FF00;]' + vars.name + ']@[[;#1E90FF;]' + server.chdir() + ']$ ');
 }
 
 function command(command) {
@@ -72,30 +80,36 @@ function command(command) {
     }
 
     var _cmd    = command; // backup initial codeline for todo checking
-    var args    = command.split(' ');
+    //var args    = command.split(' '); // old method
+    var args    = command.match(/(".*?"|[^"\s]+)+(?=\s*|\s*$)/g); // do NOT split spaces between quotes
     var command = args[0];
     args.splice(0, 1);
 
-    if(!commands.hasOwnProperty(command))
-        return display('{f_red:La commande ' + command + ' n\'est pas disponible}');
+    if(!commands.hasOwnProperty(command)) {
+        console.log(commands, command);
+        return display('{f_#FE1B00:La commande ' + command + ' n\'est pas disponible}');
+    }
 
     var cmd = commands[command], cargs = commands[command].arguments, arg, err = false;
+
+    for(var a = 0; a < args.length; a += 1)
+        args[a] = args[a].replace(/^"((.|\n)*)"$/, '$1');
 
     for(var i = 0; i < cargs.length; i += 1) {
         arg = cargs[i];
 
         if(arg.required && args.length < (i + 1)) {
-            err = '{f_red:L\'argument }{f_green,italic:' + arg.name + '}{f_red: est manqant pour la fonction }{f_cyan:' + command + '}';
+            err = '{f_#FE1B00:L\'argument }{f_green,italic:' + arg.name + '}{f_#FE1B00: est manqant pour la fonction }{f_cyan:' + command + '}';
             break;
         }
 
         if(arg.regex && !arg.regex.test(args[i])) {
-            err = '{f_red:' + arg.error + '}';
+            err = '{f_#FE1B00:' + arg.error + '}';
             break;
         }
 
         if(arg.verif && !arg.verif(args[i])) {
-            err = '{f_red:' + arg.error + '}';
+            err = '{f_#FE1B00:' + arg.error + '}';
             break;
         }
     }
@@ -106,7 +120,7 @@ function command(command) {
     var err = cmd.core.apply(window, args);
 
     if(typeof err === 'string')
-        return display('{f_red:' + err + '}');
+        return display('{f_#FE1B00:' + err.split('\n').join('}\n{f_#FE1B00:') + '}');
 
     saveGame();
 
@@ -198,7 +212,7 @@ var commands = {
 
         core: function(name) {
             vars.name = name;
-            term.set_prompt(vars.name + ' $ ');
+            updatePrompt();
             //saveGame(); // futile
         }
     },
@@ -212,7 +226,7 @@ var commands = {
                 legend: 'Adresse IP du serveur distant',
                 verif : function(IP) {
                     if(!IP.match(/^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$/)) {
-                        this.error = 'Cette adresse IP n\'est pas valide. Une adresse IP doit être constituée de la forme suivant : {b_white,f_black:x.x.x.x} où {b_white,f_black:x} désigne un à trois chiffres';
+                        this.error = 'Cette adresse IP n\'est pas valide. Une adresse IP doit être constituée de la forme suivant : }{b_white,f_black:x.x.x.x}{f_#FE1B00: où }{b_white,f_black:x}{f_#FE1B00: désigne un à trois chiffres';
                         return false;
                     }
 
@@ -238,7 +252,39 @@ var commands = {
             if(instant) {
                 instantServerConnect(connectingIP);
                 send(['Connecté au serveur {italic:' + connectingIP + '}']);
-            } else
+            } else {
+                var serverSecurity = servers[IP].security, securityHack = [], hackMessages = {
+                    'certificate-verification': ['Création du faux certificat...', 2000, 'Votre certificat d\'authentification n\'est pas valide.'],
+                    'IP-blacklist': ['Création d\'une adresse IP sur liste blanche...', 7000, 'Cette adresse IP ne fait pas partie de notre liste blanche.'],
+                    'geolocalisation': ['Modification de la zone géographique de l\'adresse IP...', 4500, 'Votre zone géographique n\'est pas autorisée à se connecter à ce serveur.'],
+                    'ddos': ['Envoi de requêtes massives sur le serveur. Cela peut prendre plusieurs minutes...', 20 * servers[IP]['ddos-complexity'], 'Ce serveur est protégé contre les attaques DDos.'],
+                    'multi-tries-IP': ['Tentative de connexion avec une autre adresse IP...', 3000, 'Le serveur a détecté un trafic anormal.'],
+                }, hacks = servers.__local.apps, hack = true;
+
+                for(var i = 0; i < serverSecurity.length; i += 1) {
+                    securityHack.push('{f_cyan,italic:Hacking server }{f_#FE1B00:' + hackMessages[serverSecurity[i]][2] + '}');
+                    securityHack.push({type: 'wait', content: 2000});
+
+                    if(hacks.indexOf('hack-' + serverSecurity[i]) !== -1) {
+                        // can hack this
+                        securityHack.push('{f_cyan,italic:Hacking server} ' + hackMessages[serverSecurity[i]][0]);
+                        securityHack.push({type: 'wait', content: hackMessages[serverSecurity[i]][1]});
+                    } else {
+                        // can't hack this
+                        securityHack.push('{f_cyan,italic:Hacking server} {italic:Impossible d\'outrepasser cette sécurité serveur}');
+                        hack = false
+                        break;
+                    }
+                }
+
+                if(!hack) {
+                    securityHack.push('{f_#FE1B00:La connexion au serveur a échoué.}');
+                    securityHack.push({type: 'wait', content :1000});
+                    securityHack.push({type: 'js', content: 'stopSending();'});
+                } else {
+                    securityHack.push('{f_cyan,italic:Hacking server }{f_#33FF66:Réussi !}');
+                }
+
                 send([
                     'Connexion au serveur distant...',
                     {type: 'wait', content: 5000},
@@ -247,7 +293,8 @@ var commands = {
                     'Résolution de l\'adresse...',
                     {type: 'wait', content: 3000},
                     'Authentification SSH...',
-                    {type: 'wait', content: 7000},
+                    {type: 'wait', content: 7000}
+                ].concat(securityHack).concat([
                     'Validation du certificat SSH..',
                     {type: 'wait', content: 3000},
                     'Connexion réussie !\nRécupération des informations serveur...',
@@ -255,7 +302,23 @@ var commands = {
                     '{italic:Connecté au serveur distant : ' + connectingIP + '}\n{italic:Toutes les commandes que vous allez saisir seront exécutées sur le serveur distant.}',,
                     {type: 'js', content: 'instantServerConnect(connectingIP);'}
                     // ask for login and password
-                ]);
+                ]));
+            }
+        }
+    },
+
+    cd: {
+        legend: 'Changer de répertoire courant',
+        arguments: [
+            {
+                name  : 'directory',
+                legend: 'Nouveau répertoire',
+                required: true
+            }
+        ],
+        core: function(dir) {
+            if(!server.chdir(dir))
+                return 'Ce répertoire n\'existe pas';
         }
     },
 
@@ -265,12 +328,72 @@ var commands = {
         arguments: [
             {
                 name  : 'directory',
-                legend: 'Dossier à lire, si omit, lit la racine du serveur'
+                legend: 'Dossier à lire, si omis, lit la racine du serveur'
+            },
+            {
+                name: 'options',
+                legend: 'Commence par un tiret.\n{f_cyan:d} Affiche les détails pour chaque fichier et dossier\n{f_cyan:h} Affiche les fichiers et dossiers cachés'
             }
         ],
 
-        core: function(dir) {
-            // list files and dirs
+        core: function(dir, details) {
+            var list = server.ls(dir, details && details.indexOf('h') !== -1);
+
+            if(!list)
+                return 'Ce dossier n\'existe pas';
+
+            if(!details || details.indexOf('d') === -1) {
+                display(list.join('\n'));
+                return ;
+            }
+
+            var maxLength = 0;
+
+            for(var i = 0; i < list.length; i += 1)
+                if(list[i].length > maxLength)
+                    maxLength = list[i].length;
+
+            for(i = 0; i < list.length; i += 1)
+                display('{f_#90EE90:' + list[i] + '}' + ' '.repeat(maxLength - list[i].length) + ' {f_#7FFFD4:' + (server.fileExists((dir || '') + '/' + list[i]) ? 'file' : 'directory') + '}');
+        }
+    },
+
+    read: {
+        legend: 'Lire un fichier',
+        arguments: [
+            {
+                name  : 'filename',
+                legend: 'Nom du fichier',
+                required: true
+            }
+        ],
+        core: function(file) {
+            var content = server.readFile(file);
+
+            if(file === false)
+                return 'Ce fichier n\'existe pas';
+
+            display(content);
+        }
+    },
+
+    write: {
+        legend: 'Écrit dans un fichier',
+        arguments: [
+            {
+                name  : 'filename',
+                legend: 'Nom du fichier',
+                required: true
+            },
+            {
+                name  : 'content',
+                legend: 'Contenu à écrire',
+                required: true
+            }
+        ],
+        core: function(file, content) {
+            if(!server.writeFile(file, content))
+                return 'Impossible d\'écrire dans ce fichier';
         }
     },
 
@@ -282,8 +405,9 @@ var commands = {
                 name  : 'command',
                 legend: 'Afficher le texte d\'aide d\'une commande',
                 verif : function(name) {
-                    return commands.hasOwnProperty(name) ? true : 'Cette commande n\'existe pas';
-                }
+                    return commands.hasOwnProperty(name);
+                },
+                error: 'Cette commande n\'existe pas'
             }
         ],
 
@@ -298,12 +422,71 @@ var commands = {
 
                 for(var j = 0; j < args.length; j += 1) {
                     if(!args[j].helpHide)
-                        help += '\n    {f_green:' + args[j].name + '} ' + args[j].legend;
+                        help += '\n    {f_green:' + args[j].name + '} ' + args[j].legend.split('\n').join('\n    ' + ' '.repeat(args[j].name.length) + ' ');
                 }
             }
 
             display(help.substr(1) + '\n');
 
+        }
+    },
+
+    networks: {
+        legend: 'Liste les réseaux disponibles sur le serveur courant',
+        arguments: [],
+        core: function() {
+            display(server.get().networks.join('\n'));
+        }
+    },
+
+    browser: {
+        legend: 'Récupère des données sur le réseau local. Nécessite d\'avoir l\'application "browser" installée sur la machine',
+        arguments: [
+            {
+                name  : 'URL',
+                legend: 'URL à récupérer',
+                required: true
+            },
+            {
+                name  : 'protocol',
+                legend: 'Nom du réseau à utiliser. Si omis, se connecte au réseau "internet"'
+            }
+        ],
+        core: function(url, proto) {
+            var network = server.get().networks;
+            proto       = proto || 'internet';
+
+            if(network.indexOf(proto) === -1)
+                return 'Impossible de se connecter au réseau sélectionné';
+
+            if(!game.networks[proto].hasOwnProperty(url))
+                return 'Page non trouvée';
+
+            display(game.networks[proto][url]);
+        }
+    },
+
+    js: {
+        legend: 'Exécute une commande JavaScript. À utiliser avec précaution !!',
+        arguments: [
+            {
+                name  : 'command',
+                legend: 'Commande à exécuter',
+                required: true
+            }
+        ],
+        core: function(cmd) {
+            try {
+                var output = new Function([], cmd)();
+
+                if(typeof output !== 'undefined')
+                    display(output);
+            }
+
+            catch(e) {
+                console.log(e);
+                return e.message;
+            }
         }
     }
 
@@ -314,7 +497,7 @@ var term = $('#terminal').terminal(function(cmd, term) {
 }, {
     greetings  : '',
     name       : 'Haskier',
-    prompt     : 'Shaun $ ',
+    prompt     : '$ ',
     completion : Object.keys(commands)
 });
 
@@ -359,48 +542,56 @@ function send(messages) {
 }
 
 function treatSending() {
-    if(!queue.length) {
+    while(typeof queue[0] === 'undefined')
+        queue.splice(0, 1); // fix chrome bug
+
+    var keys = Object.keys(queue);
+
+    if(!queue.length || !keys.length) {
         saveGame();
         return ;
     }
 
-    var scheduleNext = true, place = Object.keys(queue)[0], q = queue[place];
+    var scheduleNext = true, place = keys[0], q = queue[place];
 
-    if(typeof q === 'string')
+    if(typeof q === 'string' && scenarioIf)
         display(formatColor(q));
     else {
         var keys = Object.keys(q);
 
-        if(keys.length === 1)
+        if(keys.length === 1 && !q.type)
             q = {
                 type: keys[0],
                 content: q[keys[0]]
             };
 
-        if(q.type === 'file')
+        if(q.type === 'file' && scenarioIf)
             display('\nFichier : {f_cyan,italic:' + q.filename + '}\n\n=================================\n' + '{italic:' + q.content.split('\n').join('}\n{italic:') + '}\n=================================\n');
-        else if(q.type === 'incoming-communication')
+        else if(q.type === 'incoming-communication' && scenarioIf)
             display('{f_darkgrey:=== Communication entrante ===}');
-        else if(q.type === 'taken')
+        else if(q.type === 'taken' && scenarioIf)
             display('{italic:' + q.name + ' est occuppé}');
-        else if(q.type === 'command')
+        else if(q.type === 'command' && scenarioIf)
             command(q.content, true);
-        else if(q.type === 'choice') {
+        else if(q.type === 'choice' && scenarioIf) {
             display('');
 
             for(var i = 0; i < q.answers.length; i += 1)
                 display('{bold:' + (i + 1) + '} : ' + q.answers[i]);
 
             answersLength = q.answers.length;
-            display('\nVotre choix ? [1-' + answersLength + ']\n');
+            display('');
+            term.set_prompt('Votre choix [1-' + answersLength + '] ? ');
 
             onBeforeCommand = function(cmd) {
                 cmd = parseInt(cmd);
 
                 if(!cmd || cmd < 1 || cmd > answersLength)
-                    return display('{f_red:Choix invalide}');
+                    return display('{f_#FE1B00:Choix invalide}');
 
+                display('');
                 term.pause();
+                updatePrompt();
                 onBeforeCommand = null;
                 vars.choice     = cmd ;
                 setTimeout(treatSending, 1);
@@ -409,11 +600,12 @@ function treatSending() {
 
             scheduleNext = false;
             term.resume();
-        } else if(q.type === 'input') {
-            display('');
+        } else if(q.type === 'input' && scenarioIf) {
+            term.set_prompt('? ');
 
             onBeforeCommand = function(cmd) {
                 term.pause();
+                updatePrompt();
                 onBeforeCommand = null;
                 vars.input      = cmd ;
                 setTimeout(treatSending, 1);
@@ -422,18 +614,46 @@ function treatSending() {
 
             scheduleNext = false;
             term.resume();
+        } else if(q.type === 'js' && scenarioIf) {
+            try { new Function([], q.content)(); }
+            catch(e) {
+                display('{f_#FE1B00:Scenario JS command has crashed. Open developper\'s console for more details.}');
+                console.log(q, e);
+            }
+        } else if(q.type === 'if') {
+            if(q.var)
+                scenarioIf = vars[q.var] === q.mustBe.toString();
+            else if(q.server)
+                scenarioIf = new Server(servers[q.server]).readFile(q.file) === q.mustBe.toString();
+        } else if(q.type === 'else') {
+            scenarioIf = !scenarioIf;
+        } else if(q.type === 'end') {
+            scenarioIf = true;
+        } else if(q.type === 'game-over' && scenarioIf) {
+            display('{f_#FE1B00,bold:Vous avez échoué. }{f_#FE1B00,bold,italic:Game Over}');
+            queue        = [];
+            queue[place] = 0;
+            scheduleNext = false;
+        } else if(q.type !== 'wait' && scenarioIf) {
+            display('{f_#FE1B00:Unknown scenario command. Open developper\'s console for more details.}');
+            console.error(q);
         }
     }
 
     var old = q;
     queue.splice(place, 1);
 
-    if(!queue.length)
+    if(!queue.length || !Object.keys(queue).length) // fix chrome bug
         term.resume();
     else if(scheduleNext)
         setTimeout(function() {
             treatSending();
-        }, ((typeof old === 'string' || old.type === 'file') ? 500 + 50 * (old.length || old.content.length / 1.25) : (old.wait || 50 * old.length || 3000)) * normalSpeed);
+        }, (
+            (!scenarioIf ? 0 :
+                (typeof old === 'string' || old.type === 'file') ?
+                500 + 50 * (old.length || old.content.length / 1.25) :
+                    (q.type === 'if' || q.type === 'else' || q.type === 'end' ? 0 :
+                        (old.wait || 50 * old.length || 3000)))) * normalSpeed);
 }
 
 function stopSending() {
@@ -455,6 +675,7 @@ function saveGame(afterPoint) {
         version      : version,
         servers      : servers,
         gameVersion  : game.version,
+        chdir        : server.chdir(),
 
         didSomethingAfterSave: didSomethingAfterSave ? 1 : 0
     }));
@@ -469,6 +690,7 @@ function readHistory(point) {
     progress[point] = true;
 
     todo = _history[point].todo;
+    console.log(_history[point].actions);
     send(_history[point].actions || []);
 }
 
@@ -490,7 +712,7 @@ if(save) {
             if(save.version !== version)
                 console.warn('Save version is different of current engine version (' + save.version + ' != ' + version + ')\n' + next);
             else
-                console.warn('Save game version is differont of current game version (' + save.gameVersion + ' != ' + game.version + ')\n' + next);
+                console.warn('Save game version is different of current game version (' + save.gameVersion + ' != ' + game.version + ')\n' + next);
             localStorage.setItem('haskier_backup', localStorage.getItem('haskier'));
             localStorage.removeItem('haskier');
             save = {};
@@ -523,11 +745,16 @@ for(var i in servers)
 
 var server = new Server(servers[vars.server]);
 
+if(typeof save.chdir !== 'undefined')
+    server.chdir(save.chdir);
+
 var historyPoint = save.historyPoint || '_init';
 var didSomethingAfterSave = save.didSomethingAfterSave || 0;
 var todo         = _history[historyPoint].todo;
 
-//display('{f_red,bold,italic:Reprise du jeu}');
+//display('{f_#FE1B00,bold,italic:Reprise du jeu}');
+
+updatePrompt();
 
 if(historyPoint === Object.keys(_history)[0] && !save.didSomethingAfterSave)
     term.clear();

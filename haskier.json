@@ -1,5 +1,5 @@
 {
-    "version": "3",
+    "version": "7",
 
     "history": {
         "_init": {
@@ -82,6 +82,47 @@
             "todo": [
                 "open-communication-port"
             ]
+        },
+
+        "code du serveur d'essai trouvé": {
+            "actions": [
+                "K : Quel est le code que vous avez trouvé ?",
+                { "type": "input" },
+                "K : $input ?",
+                { "type": "if", "var": "input", "mustBe": 5479 },
+                "K : Effectivement, c'est bien le bon code.",
+                { "type": "else" },
+                "K : Je suis désolé, mais ce n'est pas le bon code. Vous avez échoué.",
+                { "type": "game-over" },
+                { "type": "end" },
+                "K : Je vais maintenant vous soumettre à un deuxième test, pour voir si vous pouvez vraiment aller loin.",
+                "K : Vous allez pirater le serveur dont l'adresse IP est {italic:127.32.48.53} et écrire {italic:test réussi} dans le fichier {italic:try.txt}",
+                "K : Rouvrez le port communication une fois que ça sera fait",
+                { "command": "com close" }
+            ],
+
+            "todo": [
+                "open-communication-port"
+            ]
+        },
+
+        "fichier écrit sur le serveur d'essai 2": {
+            "actions": [
+                "K : Voyons voir...",
+                "K : Je me connecte au serveur...",
+                { "wait": 3000 },
+                { "type": "if", "server": "127.32.48.53", "file": "try.txt", "mustBe": "test réussi" },
+                "K : Le fichier a bien été modifié.",
+                { "type": "else" },
+                "K : Le fichier n'est pas correct.",
+                { "type": "game-over" },
+                { "type" : "end" },
+                "K : Vous avez réussi l'épreuve d'essai. Nul doute que vous avez à votre disposition d'excellents outils."
+            ],
+
+            "todo": [
+                "open-communication-port"
+            ]
         }
     },
 
@@ -98,14 +139,15 @@
                 },
                 ".sys": { ".log": "[]" }
             },
-            "apps": ["browser", "app", "format"],
+            "apps": ["browser", "app", "format", "hack-certificate-verification", "hack-geolocalisation"],
             "os": "Century",
-            "filesTable": []
+            "filesTable": {},
+            "networks": ["internet", "__local"]
         },
 
         "127.2.5.364": {
-            "description": "Serveur Anonymas pour test de sécurité",
-            "security_config": {},
+            "description": "Serveur Anonymas pour test de sécurité (1)",
+            "security": ["certificate-verification"],
             "login": {
                 "identifier": "master",
                 "password"  : "for-hacking-test"
@@ -115,23 +157,46 @@
                 ".sys": { ".log": "[]" }
             },
             "apps":  [],
-            "os": "anonym0s",
-            "filesTable": []
+            "os"  : "anonym0s",
+            "filesTable": {},
+            "networks": ["internet"]
+        },
+
+        "127.32.48.53": {
+            "description": "Serveur Anonymas pour test de sécurity (2)",
+            "security": ["certificate-verification", "geolocalisation"],
+            "login": {
+                "identifier": "master",
+                "password"  : "for-hacking-test"
+            },
+            "files": {},
+            "apps" : [],
+            "os"   : "anonym0s",
+            "filesTable": {},
+            "networks": ["internet"]
         },
 
         "824.54.63.772.5": {
             "description": "Serveur maître Anonymas",
-            "security_config": {
-                "ddos": true,
-                "multitries-IP": 10
-            },
+            "security": ["certificate-verification", "IP-blacklist", "geolocalisation", "ddos", "multi-tries-IP"],
+            "ddos-complexity": 20,
             "files": {
                 ".sys": { ".log": "[]" }
             },
             "apps": ["aes-server"],
             "os": "anonym0s-security",
-            "filesTable": []
+            "filesTable": {},
+            "networks": []
         }
+    },
+
+    "networks": {
+        "internet": {
+            "/home" : "Vous êtes sur la page d'accueil du réseau.\n\nVoici une liste des services disponibles :\n\n/infos  Informations sur le réseau\n/about  À propos du réseau",
+            "/infos": "Réseau   : \"internet\"\nCryptage : Non\nFormat   : UTF-8",
+            "/about": "Réseau \"internet\" créé par Macrosoft Corporation le 18 juin 1987. Toute utilisation frauduleuse peut faire l'objet de poursuites judiciaires.\nNous ne pouvons en aucun cas être tenus responsables d'éventuels problèmes liés à l'utilisation de ce réseau."
+        },
+        "__local": {"commentaire":"Mettre ici un fichier contenant des informations pratiques pour accélérer le jeu. Crypter le tout en AES et rendre sa décryption difficile !"}
     },
 
     "statesModel": {
