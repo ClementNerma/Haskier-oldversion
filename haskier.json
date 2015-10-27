@@ -2,9 +2,50 @@
     "version": "7",
 
     "history": {
+        "__tutorial": {
+            "actions": [
+                { "wait": 1000 },
+                { "choice": ["Voir le tutoriel (recommandé si vous jouez pour la première fois à $haskier)", "Ignorer le tutoriel"] },
+                { "type":   "if"  , "var": "choice", "mustBe": 1},
+                "{f_grey,italic:=== Introduction ===}\n",
+                "Bienvenue dans le {b_$blue:tutoriel} de $haskier.",
+                "$haskier est un jeu dans lequel vous incarnez $name, un jeune étudiant de 17 ans, passionné de sécurité informatique.",
+                "Vous souhaitez intégrer une organisation célèbre nommée {italic:Anonymas}.",
+                "Mais ses membres ne révèlent pas leur identité au grand jour et il est complexe de les joindre.",
+                "Afin de leur prouver que vous êtes doué en piratage, vous vous infiltrez sur l'un de leurs serveurs privés et récupérez la liste de leurs membres.",
+                "Vous leur laissez un message leur disant que si ils veulent que vous gardiez secret cette liste, ils devront répondre à vos attentes.",
+                "Pour vous joindre, ils doivent utiliser votre adresse IP que vous avez laissé à leur disposition sur leur serveur.",
+                { "wait": 1000 },
+                "\n{f_grey,italic:=== Comment jouer ? ===}\n",
+                "Dans $haskier, vous disposez d'une interface nommée {italic:ligne de commande}.",
+                "Il s'agit d'une interface dans lequel s'affichent des messages et dans laquelle vous pouvez saisir des {italic:commandes}.",
+                "Ces {italic:commandes} vous permettent d'effectuer diverses actions",
+                "Comme communiquer avec quelqu'un, récupérer un fichier sur un serveur, vous connecter à un autre ordinateur, etc.",
+                "Si vous avez déjà utilisé des outils comme un {italic:Terminal} sous Linux ou Mac OS,",
+                "Ou bien {italic:cmd} ou {italic:l'invite de commandes} sous Windows, ce tutoriel devrait se révéler assez simple pour vous.",
+                "Dans le cas contraire, suivez bien les explications suivantes :\n",
+                "Une commande se compose d'un nom de commande et de ses arguments. Voici un exemple de commande :\n",
+                " {f_cyan:firewall} {f_$green:enable}\n",
+                "La partie en {f_cyan:bleue} désigne le nom de la commande et la partie en {f_$green:vert} ses arguments.",
+                "Ici, il n'y a qu'un seul argument : {f_$green:enable}",
+                "Chaque argument doit être séparé par un espace. Si l'argument contient des espaces, il doit être entouré de guillemets, comme ceci :\n",
+                " {f_cyan:nom_commande} {f_$green:argument1 argument2 \"troisième argument très long\" argument4 \"cinquième argument\"}\n",
+                "Vous voyez ?",
+                "Si vous ne savez pas quelle commande utiliser pour effectuer une action, utilisez la commande <{f_cyan:help}>",
+                "Lorsque vous saisissez une commande, appuyez sur la touche {bold:Entrée} pour l'exécuter",
+                "Si un message en rouge s'affiche, alors il est probable qu'une erreur se soit produite. Lisez alors le message affiché à l'écran.",
+                "Il s'agit généralement d'une mauvaise utilisation de la commande (mauvais argument...)\n",
+                "Ce tutoriel est à présent terminé. Merci de votre patience !",
+                { "type": "end" },
+                { "command": "clear" },
+                { "js": "historyNext();" }
+            ],
+
+            "todo": []
+        },
+
         "_init": {
             "actions": [
-                {"type": "wait", "content": 1500},
                 "{b_blue:Système} {italic:Quelqu'un cherche à vous joindre}",
                 "{b_blue:Système} {italic:Pour ouvrir la communication, tapez <}{f_cyan:com open}{italic:>}"
             ],
@@ -17,7 +58,7 @@
             "actions": [
                 "Communication entrante...",
                 "Ouverture du réseau...",
-                "{b_red,f_white: - Bloqué par le pare-feu - }",
+                "{b_$red,f_white: - Bloqué par le pare-feu - }",
                 "Veuillez désactiver le pare-feu\nPour plus d'informations, tapez <{f_cyan:help firewall}>"
             ],
             "todo": [
@@ -52,17 +93,14 @@
                 "K : Vous avez laissé suffisamment d'informations derrières vous pour que nous vous croyions",
                 "K : Maintenant, me voici",
                 "K : Que voulez-vous en échange de votre silence ?",
-                {
-                    "type": "choice",
-                    "answers": ["Une place dans votre organisation"]
-                },
+                { "choice": ["Une place dans votre organisation"] },
                 "K : Une place dans notre organisation... ?",
                 "K : Très bien. Je vais voir ce que je peux faire",
                 "K : Attendez un peu",
-                {"type": "taken", "name": "K", "wait": 10000},
+                { "type": "taken", "name": "K", "wait": 10000 },
                 "K : Mes supérieurs sont prêts à vous prendre à l'essai",
                 "K : Je vous laisse vous préparer. Rouvrez la communication lorsque vous serez prêts",
-                {"command": "com close"}
+                { "command": "com close" }
             ],
             "todo": [
                 "open-communication-port"
@@ -76,7 +114,7 @@
                 "K : Son adresse IP est {italic:127.2.5.364}. Il ne dispose d'aucune sécurité particulière, ce devrait être un vrai jeu d'enfant pour vous, n'est-ce pas ?",
                 "K : Lorsque vous aurez trouvé, rouvrez le port communication et donnez-moi le code",
                 "K : À tout de suite",
-                {"command": "com close"}
+                { "command": "com close" }
             ],
 
             "todo": [
