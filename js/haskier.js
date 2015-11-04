@@ -11,9 +11,10 @@
   *     - Support of multiple servers
   *     - Filesystem commands
   *     - Fake SSH
+  *     - And so much !
   */
 
-var version = '0.3.0.2b', normalSpeed = 1, scenarioIf = true;
+var version = '0.3.0.2b', normalSpeed = 1, scenarioIf = true, _sm_saves, _sm_saves_json, sendInstant = false;
 
 try {
     var game = JSON.parse($.ajax({
@@ -55,6 +56,18 @@ $('#go_fullscreen').click(function() {
     }
 });
 
+function formatDate(ms) {
+    var date    = new Date(ms)                    ,
+        day     = (date.getDay() + 1).toString()  ,
+        month   = (date.getMonth() + 1).toString(),
+        years   = date.getFullYear().toString()   ,
+        hours   = date.getHours().toString()      ,
+        minutes = date.getMinutes().toString()    ;
+
+    return '0'.repeat(2 - day.length) + day + '/' + '0'.repeat(2 - month.length) + month + '/' + years + ' '
+         + '0'.repeat(2 - hours.length) + hours + ':' + '0'.repeat(2 - minutes.length) + minutes;
+}
+
 function instantServerConnect(IP) {
     vars.server           = IP;
     //vars.connectedLogged  = false;
@@ -68,32 +81,70 @@ function updatePrompt() {
 }
 
 function command(command) {
+    var l = command.split(';;');
+
+    if(l.length > 1) {
+        for(var i = 0; i < l.length; i += 1)
+            window.command(l[i]);
+
+        return ;
+    }
+
     if(!command)
         return ;
 
-    if(!onBeforeCommand)
-        didSomethingAfterSave = true;
+    command = command.replace(/\\;;/g, ';;');
+
+    var parsed = $.terminal.parseCommand(command.trim());
 
     if(onBeforeCommand) {
-        if(!onBeforeCommand(command))
+        if(!onBeforeCommand(command, parsed))
             return ;
-    }
+        else
+            didSomethingAfterSave = true;
+    } else
+        didSomethingAfterSave = true;
 
-    var _cmd    = command; // backup initial codeline for todo checking
+    /*var _cmd    = command; // backup initial codeline for todo checking
     //var args    = command.split(' '); // old method
     var args    = command.match(/(".*?"|[^"\s]+)+(?=\s*|\s*$)/g); // do NOT split spaces between quotes
     var command = args[0];
-    args.splice(0, 1);
+    args.splice(0, 1);*/
+
+    var _cmd    = command,
+        command = parsed.name,
+        args    = parsed.args;
+
+    // Store log
+
+    if(!server.directoryExists('.sys'))
+        server.makeDirectory('.sys');
+
+    try {
+        var log = JSON.parse(server.readFile('.sys/.log') || '[]');
+        log.push([command].concat(args).join(' '));
+        if(!server.writeFile('.sys/.log', JSON.stringify(log)))
+            console.error('Failed to log command : ' + [command].concat(args).join(' '));
+    }
+
+    catch(e) {
+        console.error('Corrupted log');
+        server.makeDirectory('.sys');
+        if(!server.writeFile('.sys/.log', '[]'))
+            console.error('Failed to create a new empty log');
+    }
+
+    // Run command
 
     if(!commands.hasOwnProperty(command)) {
-        console.log(commands, command);
+        //console.log(commands, command);
         return display('{f_$red:La commande ' + command + ' n\'est pas disponible ou n\'existe pas}');
     }
 
     var cmd = commands[command], cargs = commands[command].arguments, arg, err = false;
 
-    for(var a = 0; a < args.length; a += 1)
-        args[a] = args[a].replace(/^"((.|\n)*)"$/, '$1');
+    /*for(var a = 0; a < args.length; a += 1)
+        args[a] = args[a].replace(/^"((.|\n)*)"$/, '$1');*/
 
     for(var i = 0; i < cargs.length; i += 1) {
         arg = cargs[i];
@@ -372,7 +423,7 @@ var commands = {
         core: function(file) {
             var content = server.readFile(file);
 
-            if(file === false)
+            if(content === false)
                 return 'Ce fichier n\'existe pas';
 
             display(content);
@@ -404,6 +455,15 @@ var commands = {
         arguments: [],
         core: function() {
             term.clear();
+        }
+    },
+
+    home: {
+        legend: 'Return to your own computer, logout for all servers',
+        arguments: [],
+        core: function() {
+            display('Connected to {f_cyan:home} computer');
+            instantServerConnect('__local');
         }
     },
 
@@ -448,7 +508,7 @@ var commands = {
 
                 for(var j = 0; j < args.length; j += 1) {
                     if(!args[j].helpHide)
-                        help += '\n    {f_$green:' + args[j].name + '} ' + args[j].legend.split('\n').join('\n    ' + ' '.repeat(args[j].name.length) + ' ');
+                        help += '\n    ' + args[j].legend.split('\n').join('\n    ');
                 }
             }
 
@@ -514,6 +574,133 @@ var commands = {
                 return e.message;
             }
         }
+    },
+
+    save: {
+        legend: 'Gérer votre sauvegarde de jeu',
+        arguments: [],
+        core: function() {
+            display('\n===== Gestionnaire de sauvegardes =====');
+            send(
+                [{
+                    choice: [
+                        'Créer un copie de la sauvegarde',
+                        'Restaurer une copie de la sauvegarde',
+                        'Estimer la taille de la sauvegarde',
+                        '(!) Recommencer le jeu'
+                    ]
+                }, {
+                    js: function() { // SMB = Save Manager Backup
+                        switch(vars.choice) {
+                            case 1:
+                                // make a save copy
+                                send([
+                                    { input: 'Choisissez le nom de la copie : (lettres, chiffres, {f_$green:_ -} autorisés)' },
+                                    { js: function() {
+                                        if(!vars.input.match(/^[a-zA-Z0-9_\-]+$/))
+                                            display('{f_$red:Nom de sauvegarde invalide}');
+                                        else {
+                                            localStorage.setItem('haskier_smb_' + vars.input, JSON.stringify({
+                                                date: Date.now(),
+                                                save: localStorage.getItem('haskier')
+                                            }));
+                                            display('Copie effectuée.');
+                                        }
+                                    } }
+                                ], true);
+                                break;
+
+                            case 2:
+                                // restore a save copy
+                                display('Liste des copies :');
+                                var keys       = Object.keys(localStorage), sav, date;
+                                _sm_saves      = [];
+                                _sm_saves_json = [];
+                                for(var i = 0; i < keys.length; i += 1) {
+                                    if(keys[i].match(/^haskier_smb_([a-zA-Z0-9_\-]+)$/)) {
+                                        try {
+                                            sav  = JSON.parse(localStorage.getItem(keys[i]));
+                                            date = formatDate(sav.date);
+                                            _sm_saves.push('{f_$green:' + date + ' '.repeat(16 - date.length) + '} {f_cyan:' + keys[i].substr(12) + '}');
+                                            _sm_saves_json.push(sav);
+                                        }
+
+                                        catch(e) {
+                                            _sm_saves.push('{f_$red:??????????} ' + keys[i].substr(12) + ' {f_$red:[Corrompu]}');
+                                            _sm_saves_json.push(false);
+                                        }
+                                    }
+                                }
+
+                                send([
+                                    { choice: _sm_saves.concat('{f_cyan:Annuler}') },
+                                    { js: function() {
+                                        if(vars.choice === (_sm_saves.length) + 1)
+                                            return ;
+
+                                        var save = _sm_saves_json[vars.choice - 1];
+
+                                        if(!save)
+                                            return display('{f_$red:Impossible de restaurer une sauvegarde corrompue}');
+
+                                        localStorage.setItem('haskier', save.save);
+
+                                        window.location.reload();
+                                        send([{ wait: Date.now() }]);
+                                    } }
+                                ], true);
+                                break;
+
+                            case 3:
+                                display('Liste des copies :\n');
+                                var keys = Object.keys(localStorage), list = [], corrupted = [], dates = [], sizes = [], listMax = sizeMax = 1, length, sav;
+                                for(var i = 0; i < keys.length; i += 1) {
+                                    if(keys[i].match(/^haskier_smb_([a-zA-Z0-9_\-]+)$/)) {
+                                        list.push(keys[i].substr(12));
+                                        sizes.push(localStorage.getItem(keys[i]).length);
+
+                                        try {
+                                            sav = JSON.parse(localStorage.getItem(keys[i]));
+                                            sav.date = formatDate(sav.date);
+                                            dates.push(' '.repeat(16 - sav.date.length) + sav.date);
+                                        }
+
+                                        catch(e) {
+                                            corrupted[i] = true;
+                                            dates.push('{f_$red:??????????}');
+                                        }
+
+                                        listMax = Math.max(listMax, list[list.length - 1].length);
+                                        sizeMax = Math.max(sizeMax, sizes[sizes.length - 1].toString().length);
+                                    }
+                                }
+
+                                for(i = 0; i < list.length; i += 1)
+                                    display(list[i] + ' '.repeat(listMax - list[i].length) + ' '.repeat(sizeMax - sizes[i].length) + ' {f_cyan:' + sizes[i] + '} {f_$green:' + dates[i] + '} ' + (corrupted[i] ? ' {f_$red:[Corrompu]}' : ''));
+
+                                if(!list.length)
+                                    display('Aucune sauvegarde trouvée');
+
+                                break;
+
+                            case 4:
+                                // restart the game from the beginning
+                                send([
+                                    { input: 'Souhaitez-vous réellement recommencer le jeu ? Toute progression sera perdue !\n{bold:NOTE :} Vos copies de sauvegardes seront conservées et pourront être restaurées à tout moment}\nTapez votre nom de joueur : {bold:$name} pour recommencez le jeu' },
+                                    { js: function() {
+                                        if(vars.input != vars.name)
+                                            return ;
+
+                                        localStorage.removeItem('haskier');
+                                        window.location.reload();
+                                    } }
+                                ], true);
+                                break;
+                        }
+                    }
+                }]
+            );
+        }
     }
 
 };
@@ -524,7 +711,8 @@ var term = $('#terminal').terminal(function(cmd, term) {
     greetings  : '',
     name       : 'Haskier',
     prompt     : '$ ',
-    completion : Object.keys(commands)
+    completion : Object.keys(commands),
+    clear      : false
 });
 
 var queue = [];
@@ -556,9 +744,10 @@ function display(message) {
     })));
 }
 
-function send(messages) {
+function send(messages, instant) {
     if(queue.length) {
-        queue = queue.concat(messages);
+        queue       = queue.concat(messages);
+        sendInstant = instant;
         return ;
     }
 
@@ -627,6 +816,9 @@ function treatSending() {
             scheduleNext = false;
             term.resume();
         } else if(q.type === 'input' && scenarioIf) {
+            if(q.content)
+                display(q.content);
+
             term.set_prompt('? ');
 
             onBeforeCommand = function(cmd) {
@@ -641,7 +833,7 @@ function treatSending() {
             scheduleNext = false;
             term.resume();
         } else if(q.type === 'js' && scenarioIf) {
-            try { new Function([], q.content)(); }
+            try { typeof q.content === 'function' ? q.content() : new Function([], q.content)(); }
             catch(e) {
                 display('{f_$red:Scenario JS command has crashed. Open developper\'s console for more details.}');
                 console.log(q, e);
@@ -671,9 +863,10 @@ function treatSending() {
     var old = q;
     queue.splice(place, 1);
 
-    if(!queue.length || !Object.keys(queue).length) // fix chrome bug
+    if(!queue.length || !Object.keys(queue).length) { // fix chrome bug
+        sendInstant = false;
         term.resume();
-    else if(scheduleNext)
+    } else if(scheduleNext)
         setTimeout(function() {
             treatSending();
         }, (
@@ -681,7 +874,7 @@ function treatSending() {
                 (typeof old === 'string' || old.type === 'file') ?
                 500 + 50 * (old.length || old.content.length / 1.25) :
                     (q.type === 'if' || q.type === 'else' || q.type === 'end' ? 0 :
-                        (old.wait || 50 * old.length || 3000)))) * normalSpeed);
+                        (old.wait || 50 * old.length || 3000)))) * (normalSpeed && (sendInstant ? 0 : 1)));
 }
 
 function stopSending() {
@@ -718,7 +911,7 @@ function readHistory(point) {
     progress[point] = true;
 
     todo = _history[point].todo;
-    console.log(_history[point].actions);
+    //console.log(_history[point].actions);
     send(_history[point].actions || []);
 }
 

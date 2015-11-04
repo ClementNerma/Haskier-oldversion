@@ -80,7 +80,12 @@ var Server = function(server) {
         if(err)
             return false;
 
-        var r = write ? true : (typeof d[path[i]] === type ? d[path[i]] : false);
+        /*var r = write ? true : (typeof d[path[i]] === type ? d[path[i]] : false);
+
+        if(!write || !r)
+            return r;*/
+
+        var r = write || (typeof d[path[i]] === type ? d[path[i]] : false);
 
         if(!write || !r)
             return r;
