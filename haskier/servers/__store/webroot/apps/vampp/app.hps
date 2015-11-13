@@ -1,0 +1,21 @@
+'use strict';
+module.legend    = 'Mettre en place un serveur de partage de fichiers sur le réseau Internet';
+module.arguments = [];
+module.core      = function() {
+    var fs     = require('fs'),
+        server = require('server'),
+        path   = require('path');
+
+    server.set(function(request) {
+        var response = new server.HTTPResponse();
+        var file     = '/webroot/' + path.normalize(request.url);
+
+        if(!fs.fileExists(file)) {
+            response.headers.push(404);
+            response.plainText = 'La page demandée n\'a pas été trouvée.';
+        } else {
+            response.headers.push(200);
+            response.plainText = fs.readFile(file);
+        }
+    });
+};

@@ -1,0 +1,9 @@
+{
+    "description": "Serveur de partage MegaDownload",
+    "login": {
+        "identifier": "poiSDFMLKSDFmlkkmlksdfpPOI_$é@{[#@fdlkj]}",
+        "password": "flkjfdl#{bilsdfjsm[]@sdklfjdslfkj[#]}"
+    },
+    "networks": ["hypernet"],
+    "security": ["certificate-verification", "IP-blacklist", "geolocalisation", "ddos", "multi-tries-IP"]
+}

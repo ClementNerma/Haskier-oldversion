@@ -1,0 +1,9 @@
+{
+    "description": "Serveur Anonymas pour test de sécurité (1)",
+    "login": {
+        "identifier": "master",
+        "password"  : "for-hacking-test"
+    },
+    "security": ["certificate-verification"],
+    "networks": ["hypernet"]
+}

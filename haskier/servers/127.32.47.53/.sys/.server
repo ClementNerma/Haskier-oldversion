@@ -1,0 +1,9 @@
+{
+    "description": "Serveur de partage hypernet",
+    "login": {
+        "identifier": "poiSDFMLKSDFmlkkmlksdfpPOI_$é@{[#@fdlkj]}",
+        "password": "flkjfdl#{bilsdfjsm[]@sdklfjdslfkj[#]}"
+    },
+    "ssh": false,
+    "networks": ["hypernet"]
+}

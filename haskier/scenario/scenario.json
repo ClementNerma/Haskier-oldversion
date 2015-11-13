@@ -1,12 +1,51 @@
 {
-    "version": "7",
-
     "history": {
+        "__install": {
+            "actions": [
+                { "js": "display('Veuillez patienter pendant l\\'installation des fichiers requis...');" },
+                { "js_file": "install.js" },
+                "Installation terminée.",
+                { "command": "clear" }
+            ],
+
+            "todo": [
+                {
+                    "type": "command",
+                    "content": "clear"
+                }
+            ]
+        },
+
         "__tutorial": {
             "actions": [
                 { "wait": 1000 },
-                { "choice": ["Voir le tutoriel (recommandé si vous jouez pour la première fois à $haskier)", "Ignorer le tutoriel"] },
-                { "type":   "if"  , "var": "choice", "mustBe": 1},
+                { "choice": [
+                    "Voir le tutoriel (recommandé si vous jouez pour la première fois à $haskier)",
+                    "Ignorer le tutoriel"
+                    ] },
+                { "type": "if", "var": "choice", "mustBe": 2 },
+                { "js": "historyNext(2);" },
+                { "type": "else" },
+                { "js": "historyNext();" },
+                { "type": "end" }
+            ],
+            "todo": []
+        },
+
+        "__tutorial_content": {
+            "actions": [
+                { "command": "clear" },
+                { "choice": [
+                    "Pour commencer...",
+                    "Sauvegardes",
+                    "Restaurer sa partie après un game over",
+                    "Serveurs et réseaux",
+                    "Boutique d'applications",
+                    "Partage de fichiers",
+                    "{f_cyan:Quitter}"
+                ] },
+
+                { "type": "if", "var": "choice", "mustBe": 1 },
                 "{f_grey,italic:=== Introduction ===}\n",
                 "Bienvenue dans le {b_$blue:tutoriel} de $haskier.",
                 "$haskier est un jeu dans lequel vous incarnez $name, un jeune étudiant de 17 ans, passionné de sécurité informatique.",
@@ -35,16 +74,67 @@
                 "Lorsque vous saisissez une commande, appuyez sur la touche {bold:Entrée} pour l'exécuter",
                 "Si un message en rouge s'affiche, alors il est probable qu'une erreur se soit produite. Lisez alors le message affiché à l'écran.",
                 "Il s'agit généralement d'une mauvaise utilisation de la commande (mauvais argument...)\n",
-                "Ce tutoriel est à présent terminé. Merci de votre patience !",
+                { "wait": 1000 },
+                { "js": "repeatHistory();" },
                 { "type": "end" },
+
+                { "type": "if", "var": "choice", "mustBe": 2 },
+                "\n{f_grey,italic:=== Sauvegardes ===}\n",
+                "Votre partie est automatiquement sauvegardée lorsque vous rentrez une commande.",
+                "Cependant, l'interruption de la partie pendant qu'une action scénaristique (moment où vous ne pouvez pas exécuter de commande) peut entraîner",
+                "La corruption de votre sauvegarde de jeu. Afin d'éviter cela, attendez que vous ayez repris le contrôle de l'invite de commandes avant de quitter le jeu.",
+                { "wait": 1000 },
+                { "js": "repeatHistory();" },
+                { "type": "end" },
+
+                { "type": "if", "var": "choice", "mustBe": 3 },
+                "\n{f_grey,italic:=== Comment restaurer sa partie après un Game Over ===}\n",
+                "Après avoir un message de {f_red,bold:Game Over} affiché à l'écran, suivez les instructions pour réinitialiser votre partie. Le jeu va recommencer depuis le début.",
+                "Dès que vous avez la main sur l'invite de commandes, tapez la commande <{f_cyan:save}> et choisissez l'option numéro {bold:2}.",
+                "Choisissez l'une des sauvegardes disponibles et entrez son numéro pour la restaurer. Votre partie sera alors restaurée.",
+                "Notez que les copies de votre sauvegarde est régulièrement effectuée, à des points-clés du jeu, afin de ne pas vous faire perdre trop de progression.",
+                { "wait": 1000 },
+                { "js": "repeatHistory();" },
+                { "type": "end" },
+
+                { "type": "if", "var": "choice", "mustBe": 4 },
+                "\n{f_grey,italic:=== Serveurs et réseaux ===}\n",
+                "Les {f_cyan:serveurs} sont des ordinateurs qui peuvent se connecter à un ou plusieurs {f_cyan:réseaux}.",
+                "Un réseau est comparable au fonctionnement d'internet. Le principal réseau d'$haskier est le réseau $hypernet.",
+                "Géré par une grande entreprise de renommée internationale, ce réseau permets l'échange de certains fichiers entre tous les serveurs connectés à ce réseau.",
+                "{bold:NOTE :} Votre ordinateur personnel est également un serveur.",
+                { "wait": 1000 },
+                { "js": "repeatHistory();" },
+                { "type": "end" },
+
+                { "type": "if", "var": "choice", "mustBe": 5 },
+                "Votre ordinateur peut se connecter à une boutique d'applications en ligne nommée {f_cyan,italic:Century Store}.",
+                "Elle vous permets de télécharger de nouvelles applications qui augmenteront les capacités de votre machine.",
+                "Pour y accéder, tapez la commande <{f_cyan:store}> et suivez les instructions qui s'affichent à l'écran.",
+                "{f_bold:NOTE :} Vous n'aurez jamais à payer avec de l'argent réel dans le jeu.",
+                { "wait": 1000 },
+                { "js": "repeatHistory();" },
+                { "type": "end" },
+
+                { "type": "if", "var": "choice", "mustBe": 6 },
+                "Certains serveurs du jeu partagent des fichiers avec tous les ordinateurs connectés au réseau $hypernet.",
+                "Vous pouvez accéder à ces fichiers sans saisir ni login ni mot de passe, car ils sont publics.",
+                "Utilisez la commande <{f_cyan:browser}> pour lire les fichiers partagés entre les serveurs.",
+                { "wait": 1000 },
+                { "js": "repeatHistory();" },
+                { "type": "end" },
+
+                { "type": "if", "var": "choice", "mustBe": 7 },
                 { "command": "clear" },
-                { "js": "historyNext();" }
+                { "js": "historyNext();" },
+                { "type": "end" }
             ],
 
             "todo": []
         },
 
         "_init": {
+            "autoBackup": "Début du jeu",
             "actions": [
                 "{b_blue:Système} {italic:Quelqu'un cherche à vous joindre}",
                 "{b_blue:Système} {italic:Pour ouvrir la communication, tapez <}{f_cyan:com open}{italic:>}"
@@ -73,17 +163,14 @@
             "actions": [
                 "Veuillez patienter...",
                 "Réception de la communication...",
-                {"type": "incoming-communication"},
+                { "type": "incoming-communication" },
                 "??? : Bonsoir $name !",
                 "??? : Vous voyez qui je suis, n'est-ce pas ?",
                 "??? : C'est le chef qui m'envoie",
                 "??? : Vous avez réussi à hacker nos serveurs et moi votre ordinateur",
                 "??? : J'ai trouvé le fichier que vous aviez laissé sur notre serveur principal",
-                {
-                    "type": "file",
-                    "filename": "Messieurs.txt",
-                    "content": "Messieurs les hackers,\n\nJe me nomme $name, je suis étudiant à Paris et j'ai 17 ans.\nVous vous croyez les meilleurs ? Voici la preuve que non.\nJ'ai récupéré le fichier contenant la liste de vos membres.\nSi vous voulez des preuves, je vais vous en donner.\nMais si vous voulez que je passe sous silence vos activités, vous allez devoir répondre à mes attentes.\nVous pouvez me contacter par vous-même en retraçant mon adresse IP, n'est-ce pas ?\nJe vous attends.\n\n$name."
-                },
+                { "wait": 500 },
+                { "type": "download", "from": "86.32.54.28", "file": "documents/hack.txt" },
                 "??? : Ai-je besoin d'ajouter quelque chose ?",
                 "??? : Très bien. Appellez-moi {italic:K}",
                 "K : C'est moi qui suis chargé de la cellule d'enquête de notre organisation, {italic:Anonymas}",
@@ -109,8 +196,9 @@
 
         "prêt pour l'essai": {
             "actions": [
+                { "type": "incoming-communication" },
                 "K : Voici l'épreuve",
-                "K : Vous devez, à l'aide des outils dont vous disposer sur votre ordinateur, réussir à récupérer le code qui se trouve sur notre serveur de test.",
+                "K : Vous devez, à l'aide des outils dont vous disposez sur votre ordinateur, réussir à récupérer le code qui se trouve sur notre serveur de test.",
                 "K : Son adresse IP est {italic:127.2.5.364}. Il ne dispose d'aucune sécurité particulière, ce devrait être un vrai jeu d'enfant pour vous, n'est-ce pas ?",
                 "K : Lorsque vous aurez trouvé, rouvrez le port communication et donnez-moi le code",
                 "K : À tout de suite",
@@ -124,6 +212,7 @@
 
         "code du serveur d'essai trouvé": {
             "actions": [
+                { "type": "incoming-communication" },
                 "K : Quel est le code que vous avez trouvé ?",
                 { "type": "input" },
                 "K : $input ?",
@@ -146,6 +235,7 @@
 
         "fichier écrit sur le serveur d'essai 2": {
             "actions": [
+                { "type": "incoming-communication" },
                 "K : Voyons voir...",
                 "K : Je me connecte au serveur...",
                 { "wait": 3000 },
@@ -156,86 +246,34 @@
                 { "type": "game-over" },
                 { "type" : "end" },
                 "K : Vous avez réussi l'épreuve d'essai. Nul doute que vous avez à votre disposition d'excellents outils.",
+                "K : Vous faites maintenant partie de l'organisation... Du moins, dans un premier temps.",
+                "K : Nous prendrons le soin de vérifier vos informations avant de vous laisser l'accès à toutes nos données",
+                "K : Vous n'y voyez aucun inconvénient, n'est-ce pas ?",
+                { "choice": [
+                    "Absolument pas",
+                    "Si"
+                    ] },
+                { "type": "if", "var": "choice", "mustBe": 2 },
+                "K : Vraiment ? Qu'avez-vous donc à cacher ?",
+                "K : Plus sérieusement, je vous recontacterai dès que nous serons absolument certains que vous ne représentez pas une menace pour nous.",
+                { "type": "else" },
+                "K : Tant mieux.",
+                "K : Je vous recontacterai dès que nous serons absolument certains que vous ne représentez pas une menace pour nous.",
+                { "type": "end" },
+                { "command": "com close" },
                 { "type": "end-of-game" }
             ],
 
             "todo": [
                 "open-communication-port"
             ]
+        },
+
+        "première nuit": {
+            "autoBackup": "Nuit après le test de K",
+            "actions": [],
+            "todo": []
         }
-    },
-
-    "servers": {
-        "__local": {
-            "description": "Ordinateur personnel de $name",
-            "login": {
-                "identifier": "$master",
-                "password": "m@st€rP@ssw0rd"
-            },
-            "files": {
-                "documents": {
-                    "mot de passe.txt": "Le mot de passe de l'ordinateur est :\nm@st€rP@ssw0rd"
-                },
-                ".sys": { ".log": "[]" }
-            },
-            "apps": ["browser", "app", "format", "hack-certificate-verification", "hack-geolocalisation"],
-            "os": "Century",
-            "filesTable": {},
-            "networks": ["internet", "__local"]
-        },
-
-        "127.2.5.364": {
-            "description": "Serveur Anonymas pour test de sécurité (1)",
-            "security": ["certificate-verification"],
-            "login": {
-                "identifier": "master",
-                "password"  : "for-hacking-test"
-            },
-            "files": {
-                "code.txt": "Donnez ce code à K pour valider l'épreuve : 5479",
-                ".sys": { ".log": "[]" }
-            },
-            "apps":  [],
-            "os"  : "anonym0s",
-            "filesTable": {},
-            "networks": ["internet"]
-        },
-
-        "127.32.48.53": {
-            "description": "Serveur Anonymas pour test de sécurité (2)",
-            "security": ["certificate-verification", "geolocalisation"],
-            "login": {
-                "identifier": "master",
-                "password"  : "for-hacking-test"
-            },
-            "files": {},
-            "apps" : [],
-            "os"   : "anonym0s",
-            "filesTable": {},
-            "networks": ["internet"]
-        },
-
-        "824.54.63.772.5": {
-            "description": "Serveur maître Anonymas",
-            "security": ["certificate-verification", "IP-blacklist", "geolocalisation", "ddos", "multi-tries-IP"],
-            "ddos-complexity": 20,
-            "files": {
-                ".sys": { ".log": "[]" }
-            },
-            "apps": ["aes-server"],
-            "os": "anonym0s-security",
-            "filesTable": {},
-            "networks": []
-        }
-    },
-
-    "networks": {
-        "internet": {
-            "/home" : "Vous êtes sur la page d'accueil du réseau.\n\nVoici une liste des services disponibles :\n\n/infos  Informations sur le réseau\n/about  À propos du réseau",
-            "/infos": "Réseau   : \"internet\"\nCryptage : Non\nFormat   : UTF-8",
-            "/about": "Réseau \"internet\" créé par Macrosoft Corporation le 18 juin 1987. Toute utilisation frauduleuse peut faire l'objet de poursuites judiciaires.\nNous ne pouvons en aucun cas être tenus responsables d'éventuels problèmes liés à l'utilisation de ce réseau."
-        },
-            "__local": {"commentaire":"Mettre ici un fichier contenant des informations pratiques pour accélérer le jeu. Crypter le tout en AES et rendre sa décryption difficile !"}
     },
 
     "statesModel": {

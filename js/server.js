@@ -6,16 +6,21 @@
 
 var Server = function(server) {
 
-    var _server = server,
+    /*var _server = server,
         _files  = server.files,
         _states = server.states,
         _table  = server.filesTable,
         _chdir  = '',
-        _hacks  = [];
+        _hacks  = [];*/
 
-    for(var i = 0; i < _server.apps.length; i += 1)
-        if(_server.apps[i].substr(0, 5) === 'hack-')
-            _hacks.push(_server.apps[i].substr(5));
+    var _files  = server,
+        _states = server.states,
+        _chdir  = '/',
+        _states = server['.sys']['.states'],
+        _server = JSON.parse(_files['.sys']['.server']);
+
+    try      { var _table  = JSON.parse(server['.sys']['.filestable']); }
+    catch(e) { var _table  = {}; }
 
     var BLANK = '';
     var SLASH = '/';
@@ -24,7 +29,7 @@ var Server = function(server) {
 
     function normalize(path) {
 
-        path = path.substr(0, 1) === '/' ? path : _chdir + '/' + path;;
+        path = path.substr(0, 1) === '/' ? path : _chdir + '/' + path;
 
         if (!path || path === SLASH) {
             return SLASH;
@@ -85,12 +90,16 @@ var Server = function(server) {
         if(!write || !r)
             return r;*/
 
-        var r = write || (typeof d[path[i]] === type ? d[path[i]] : false);
+        var r = typeof write !== 'undefined' || (typeof d[path[i]] === type ? d[path[i]] : false);
 
-        if(!write || !r)
+        if(typeof write === 'undefined' || !r)
             return r;
 
-        d[path[i]] = write;
+        if(write !== false)
+            d[path[i]] = write;
+        else
+            delete d[path[i]];
+
         return true;
     };
 
@@ -103,15 +112,41 @@ var Server = function(server) {
     };
 
     this.get = function() {
-        return _server;
+        return _files;
     };
 
     /*this.hack = function(type) {
         return _server.apps.indexOf('hack-' + type) !== -1;
     };*/
 
+    this.networks = function() {
+        return _server.networks || [];
+    };
+
+    this.hasHypranet = function() {
+        return _server.networks && _server.networks.indexOf('hypranet') !== -1;
+    };
+
     this.hacks = function() {
+        if(!_files.apps)
+            return [];
+
+        var _hacks = [], apps = Object.keys(_files.apps);
+
+        console.log(_files.apps);
+
+        for(var i = 0; i < apps.length; i += 1) {
+            if(this.directoryExists('/apps/' + apps[i]) && apps[i].substr(0, 5) === 'hack-') {
+                _hacks.push(apps[i].substr(5));
+            }
+        }
+
         return _hacks;
+    };
+
+    this.security = function() {
+        return JSON.parse(_files['.sys']['.server']).security; // fix a supposed chrome bug
+        // return _secure;
     };
 
     this.state = function(state, value) {
@@ -125,7 +160,7 @@ var Server = function(server) {
         return !!_fs(file, 'string');
     };
 
-    this.directoryExists = function(dir) {
+    this.directoryExists = this.dirExists = function(dir) {
         return !!_fs(dir, 'object');
     };
 
@@ -133,11 +168,27 @@ var Server = function(server) {
         return _fs(file, 'string', content);
     };
 
-    this.readFile = function(file) {
-        return _fs(file, 'string');
+    this.readFile = function(file, dontRemoveLastEmptyLine) {
+        var c = _fs(file, 'string');
+
+        if(typeof c !== 'string' || dontRemoveLastEmptyLine)
+            return c;
+
+        return c.substr(c.length - 1, 1) === '\n' ? c.substr(0, c.length - 1) : c;
     };
 
-    this.ls = function(dir, hiddenFiles, showTableHidden, showTableSystem) {
+    this.removeFile = function(file) {
+        return _fs(file, 'string', false);
+    };
+
+    this.makeDirectory = this.mkdir = function(dir) {
+        if(this.directoryExists(dir))
+            return false;
+
+        return _fs(dir, 'object', {});
+    };
+
+    this.ls = this.readDirectory = this.readDir = function(dir, hiddenFiles, showTableHidden, showTableSystem) {
         var d = _fs(dir, 'object');
         if(!d) return false;
 
@@ -168,6 +219,55 @@ var Server = function(server) {
         var e = this.directoryExists(dir);
         if(e) { _chdir = dir; updatePrompt(); }
         return e;
-    }
+    };
+
+    this.glob = function(search, storage, results, path, oldMatch, level) {
+
+        function regex(str) {
+            return new RegExp('^' + str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&").replace(/\\\*/g, '(.*?)').replace(/\\\?/g, '(.)') + '$');
+        }
+
+        var a, keys, regExp, j, match;
+
+        path     = path || '';
+        level    = level || 0;
+        level   += 1;
+        oldMatch = oldMatch || [];
+        search   = this.normalize(search).substr(1).split('/');
+        storage  = storage || _files;
+        results  = results || [];
+
+        for(i = 0; i < search.length - 1; i += 1) {
+            keys = Object.keys(storage);
+            path += '/' + search[i];
+            if(path.substr(0, 1) === '/')
+                path = path.substr(1);
+
+            if(search[i].indexOf('*') !== -1 || search[i].indexOf('?') !== -1) {
+                regExp = regex(search[i]);
+
+                for(j = 0; j < keys.length; j += 1) {
+                    if(match = keys[j].match(regExp)) {
+                        a = path.split('/'); a = a.slice(0, a.length - 1);
+                        glob(search.slice(i + 1).join('/'), storage[keys[j]], results, a.join('/') + '/' + keys[j], oldMatch.concat(match.slice(1)), level);
+                    }
+                }
+
+                return results;
+            }
+
+            storage = storage[search[i]];
+        }
+
+        var last = servers.__local.normalize(search[search.length - 1]).substr(1);
+        regExp   = regex(last);
+        keys     = Object.keys(storage);
+
+        for(i = 0; i < keys.length; i += 1)
+            if(match = keys[i].match(regExp))
+                results.push({path: path + '/' + keys[i], vars: oldMatch.concat(match.slice(1))});
+
+        return results;
+    };
 
 };

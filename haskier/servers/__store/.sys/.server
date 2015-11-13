@@ -1,0 +1,10 @@
+{
+    "description": "Boutique d'applications en ligne pour CenturyCode",
+    "login": {
+        "identifier": "mlksdfpoiSDFPOIKSDFMLlksdfpPOI_$é@{[#@fdlkj]}",
+        "password": "flkjfdl#{#]^@lmksdf{{[lkdjf[]@sdklfjdslfkj[#]}"
+    },
+    "ssh": false,
+    "networks": ["hypernet"],
+    "security": ["certificate-verification", "IP-blacklist", "geolocalisation", "ddos", "multi-tries-IP"]
+}

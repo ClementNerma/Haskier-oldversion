@@ -14,11 +14,22 @@
   *     - And so much !
   */
 
-var version = '0.3.0.2b', normalSpeed = 1, scenarioIf = true, _sm_saves, _sm_saves_json, sendInstant = false;
+function  r()  { allowSaving = false; localStorage.clear(); window.location.reload(); }
+function _t(f) { var d = Date.now(); f(); return Date.now() - d; }
+function _c(c) { cc=c; return _t(function(){command(cc)}); }
+function _m(c,d) { var a=0,s=Date.now(); d=d||100; for(var i=0;i<100;i+=1){command(c)} return (Date.now()-s)/100; }
+function _s()  { return JSON.parse(localStorage.getItem('haskier')); };
+
+var version = '0.3.0.5b', normalSpeed = 1, scenarioIf = true, _sm_saves, _sm_saves_json, sendInstant = false,
+    onDisplayEnd, displayMsg, displayInt, opened, paused, initMessage, displayPrompt, allowSaving = true, cc,
+    sendTimeout, activeTimeout, sending;
+
+//Object.clone = function(e){var n;if(null==e||"object"!=typeof e)return e;if(e instanceof Date)return n=new Date,n.setTime(e.getTime()),n;if(e instanceof Array){n=[];for(var t=0,r=e.length;r>t;t++)n[t]=Object.clone(e[t]);return n}if(e instanceof Object){n={};for(var o in e)e.hasOwnProperty(o)&&(n[o]=Object.clone(e[o]));return n}throw new Error("Unable to copy obj! Its type isn't supported.")};
+Object.clone = function(e){return jQuery.extend(true,{},e);};
 
 try {
-    var game = JSON.parse($.ajax({
-        url: 'haskier.json',
+    var haskier = JSON.parse($.ajax({
+        url: 'haskier.php',
         cache: false,
         method: 'GET',
         async: false
@@ -26,7 +37,16 @@ try {
 }
 
 catch(e) {
-    alert('Bad game content');
+    alert('Game is wrong or corrupted');
+    throw new Error(e);
+}
+
+try {
+    var game = JSON.parse(haskier.scenario['scenario.json']);
+}
+
+catch(e) {
+    alert('Game scenario is wrong or corrupted');
     throw new Error(e);
 }
 
@@ -71,13 +91,13 @@ function formatDate(ms) {
 function instantServerConnect(IP) {
     vars.server           = IP;
     //vars.connectedLogged  = false;
-    server                = new Server(servers[IP]);
-    states                = server.states;
+    server                = servers[IP];
+    states                = _servers[IP]['.sys']['.states'];
     saveGame();
 }
 
 function updatePrompt() {
-    term.set_prompt('[[;#00FF00;]' + vars.name + ']:[[;#1E90FF;]' + server.chdir() + ']$ ');
+    term.set_prompt('[[;' + vars.green + ';]' + vars.name + ']:[[;' + vars.blue + ';]' + server.chdir() + ']$ ');
 }
 
 function command(command) {
@@ -134,6 +154,8 @@ function command(command) {
             console.error('Failed to create a new empty log');
     }
 
+    var commands = window.commands();
+
     // Run command
 
     if(!commands.hasOwnProperty(command)) {
@@ -141,7 +163,7 @@ function command(command) {
         return display('{f_$red:La commande ' + command + ' n\'est pas disponible ou n\'existe pas}');
     }
 
-    var cmd = commands[command], cargs = commands[command].arguments, arg, err = false;
+    var cmd = commands[command], cargs = cmd.arguments, arg, err = false;
 
     /*for(var a = 0; a < args.length; a += 1)
         args[a] = args[a].replace(/^"((.|\n)*)"$/, '$1');*/
@@ -202,7 +224,30 @@ function command(command) {
         historyNext();
 }
 
-var commands = {
+function commands() {
+    var apps = server.glob('/apps/*'), commands = Object.clone(_commands), name;
+
+    // create list of commands
+
+    for(var i = 0; i < apps.length; i += 1) {
+        name = apps[i].vars[0];
+
+        if(!commands.hasOwnProperty(name) && server.dirExists('/apps/' + name) && server.fileExists('/apps/' + name + '/app.hps')) {
+            commands[name] = {};
+            try {
+                new Function(['module', 'appName'], server.readFile('/apps/' + name + '/app.hps')).apply(window, [commands[name], name]);
+            }
+
+            catch(e) {
+                throw new Error('Execution of command "' + name + '" failed :\n' + new String(e));
+            }
+        }
+    }
+
+    return commands;
+}
+
+var _commands = {
 
     com: {
         legend: 'Ouvre ou ferme le port communication',
@@ -223,6 +268,7 @@ var commands = {
                 display('Port communication {f_cyan:ouvert}');
             } else if(state === 'close') {
                 server.state('communicationOpened', false);
+                vars.talking = '';
                 display('Port communication {f_cyan:fermé}');
             }
         }
@@ -283,7 +329,7 @@ var commands = {
                         return false;
                     }
 
-                    if(!game.servers.hasOwnProperty(IP)) {
+                    if(!servers.hasOwnProperty(IP)) {
                         display('Connexion au serveur distant...');
                         sleep(5000);
                         this.error = 'Impossible de trouver le serveur associé à cette adresse IP';
@@ -306,19 +352,19 @@ var commands = {
                 instantServerConnect(connectingIP);
                 send(['Connecté au serveur {italic:' + connectingIP + '}']);
             } else {
-                var serverSecurity = servers[IP].security, securityHack = [], hackMessages = {
+                var serverSecurity = servers[IP].security(), securityHack = [], hackMessages = {
                     'certificate-verification': ['Création du faux certificat...', 2000, 'Votre certificat d\'authentification n\'est pas valide.'],
                     'IP-blacklist': ['Création d\'une adresse IP sur liste blanche...', 7000, 'Cette adresse IP ne fait pas partie de notre liste blanche.'],
                     'geolocalisation': ['Modification de la zone géographique de l\'adresse IP...', 4500, 'Votre zone géographique n\'est pas autorisée à se connecter à ce serveur.'],
                     'ddos': ['Envoi de requêtes massives sur le serveur. Cela peut prendre plusieurs minutes...', 20 * servers[IP]['ddos-complexity'], 'Ce serveur est protégé contre les attaques DDos.'],
                     'multi-tries-IP': ['Tentative de connexion avec une autre adresse IP...', 3000, 'Le serveur a détecté un trafic anormal.'],
-                }, hacks = servers.__local.apps, hack = true;
+                }, hacks = servers.__local.hacks(), hack = true;
 
                 for(var i = 0; i < serverSecurity.length; i += 1) {
                     securityHack.push('{f_cyan,italic:Hacking server }{f_$red:' + hackMessages[serverSecurity[i]][2] + '}');
                     securityHack.push({type: 'wait', content: 2000});
 
-                    if(hacks.indexOf('hack-' + serverSecurity[i]) !== -1) {
+                    if(hacks.indexOf(serverSecurity[i]) !== -1) {
                         // can hack this
                         securityHack.push('{f_cyan,italic:Hacking server} ' + hackMessages[serverSecurity[i]][0]);
                         securityHack.push({type: 'wait', content: hackMessages[serverSecurity[i]][1]});
@@ -459,7 +505,7 @@ var commands = {
     },
 
     home: {
-        legend: 'Return to your own computer, logout for all servers',
+        legend: 'Retourne sur votre ordinateur, déconnexion automatique du serveur courant (annule SSH)',
         arguments: [],
         core: function() {
             display('Connected to {f_cyan:home} computer');
@@ -475,7 +521,7 @@ var commands = {
                 name  : 'command',
                 legend: 'Afficher le texte d\'aide d\'une commande. Si omis, affiche la liste compressée des commandes',
                 verif : function(name) {
-                    return commands.hasOwnProperty(name);
+                    return commands().hasOwnProperty(name);
                 },
                 error: 'Cette commande n\'existe pas'
             }
@@ -483,7 +529,7 @@ var commands = {
 
         core: function(name) {
 
-            var list = name ? [name] : Object.keys(commands).sort(), cmd, args, help = '';
+            var commands = window.commands(), list = name ? [name] : Object.keys(commands).sort(), cmd, args, help = '';
 
             if(!name) {
                 var maxLength = 0;
@@ -525,8 +571,8 @@ var commands = {
         }
     },
 
-    browser: {
-        legend: 'Récupère des données sur le réseau local. Nécessite d\'avoir l\'application "browser" installée sur la machine',
+    /*browser: {
+        legend: 'Récupère des données sur le réseau local. Nécessite l\'application "browser"',
         arguments: [
             {
                 name  : 'URL',
@@ -550,7 +596,7 @@ var commands = {
 
             display(game.networks[proto][url]);
         }
-    },
+    },*/
 
     js: {
         legend: 'Exécute une commande JavaScript. À utiliser avec précaution !!',
@@ -576,10 +622,33 @@ var commands = {
         }
     },
 
+    about: {
+        legend: 'À propos du jeu... (Crédits, FAQ...)',
+        arguments: [],
+        core: function() {
+            display([
+                '\n{f_$blue,bold:=== Crédits ===}\n',
+                '{f_cyan:Développeur} Clément Nerma',
+                '\n{f_$blue,bold:=== Bibliothèques ===}\n',
+                'jQuery',
+                'jQuery.terminal',
+                '\n{f_$blue,bold:=== FAQ ===}\n',
+                '{bold:Q} Le message "Installation des fichiers requis" au début du jeu fait-il partie du scénario ?',
+                '{bold:R} Non, $haskier a réellement besoin d\'installer certains fichiers pour pouvoir fonctionner.\n  Il s\'agit de fichiers stockés sur votre ordinateur, mais qui ne peuvent pas être exécutés, ne vous inquiétez pas.\n',
+                '{bold:Q} Pourquoi le nom de $haskier ?',
+                '{bold:R} Ça m\'est venu comme ça, d\'un coup. Mais si vous avancez un peu dans le jeu, vous verrez à quoi ça correspond.\n',
+                '{bold:Q} Pourquoi avoir fait un jeu en ligne de commandes ? OnHack utilisait une interface graphique, non ?',
+                '{bold:R} Mon but n\'était pas vraiment de créer un jeu similaire à OnHack, mais plutôt un jeu basé sur un scénario plus profond,\n  Même si le jeu ne possède pas d\'interface graphique.\n',
+                '{bold:Q} Combien de temps as-tu mis à développer ce jeu ?',
+                '{bold:R} À l\'heure où je vous parle, je développe actuellement la version v0.2 Alpha, et j\'ai dû y passer entre une vingtaine et une trentaine d\'heures.\n  Mais j\'ai loin d\'avoir fini !'
+            ].concat('').join('\n'))
+        }
+    },
+
     save: {
         legend: 'Gérer votre sauvegarde de jeu',
         arguments: [],
-        core: function() {
+        core: function(gameOver) {
             display('\n===== Gestionnaire de sauvegardes =====');
             send(
                 [{
@@ -591,6 +660,7 @@ var commands = {
                     ]
                 }, {
                     js: function() { // SMB = Save Manager Backup
+                        //queue = []; // fix chrome bug
                         switch(vars.choice) {
                             case 1:
                                 // make a save copy
@@ -617,7 +687,7 @@ var commands = {
                                 _sm_saves      = [];
                                 _sm_saves_json = [];
                                 for(var i = 0; i < keys.length; i += 1) {
-                                    if(keys[i].match(/^haskier_smb_([a-zA-Z0-9_\-]+)$/)) {
+                                    if(keys[i].match(/^haskier_smb_(.*)$/)) {
                                         try {
                                             sav  = JSON.parse(localStorage.getItem(keys[i]));
                                             date = formatDate(sav.date);
@@ -711,7 +781,9 @@ var term = $('#terminal').terminal(function(cmd, term) {
     greetings  : '',
     name       : 'Haskier',
     prompt     : '$ ',
-    completion : Object.keys(commands),
+    completion : function() {
+        return Object.keys(commands());
+    },
     clear      : false
 });
 
@@ -738,56 +810,152 @@ function formatColor(message) {
     });
 }
 
-function display(message) {
-    term.echo(formatColor(message.replace(/\$([a-zA-Z0-9_]+)/g, function(match, v) {
-        return vars[v];
-    })));
+function display(message, onEnd) {
+    if(onEnd && normalSpeed) {
+        message = message.replace(/\$([a-zA-Z0-9_]+)/g, function(match, v) {
+            return vars[v];
+        });
+        paused = term.paused();
+        term.resume();
+        $('#cover').show().click();
+        displayPrompt = term.get_prompt();
+        term.set_prompt('');
+        onDisplayEnd = onEnd;
+        displayMsg   = initMessage = displayMsg ? displayMsg + '\n' + message : message;
+        displayMsg   = displayMsg.replace(/\{([a-zA-Z0-9#_, ]+):(.*?)\}/g, '$2').replace(/\[\[([a-zA-Z0-9# ;]+)\](.*?)\]/g, '$2');
+        opened       = '';
+        displayInt   = setInterval(function() {
+            /*while('{}'.indexOf(message.substr(0, 1)) !== -1) {
+                if(displayMsg.substr(0, 1) === '{') {
+                    opened  = displayMsg.match(/^\{([a-zA-Z0-9#_, ]+):(.*?)\}/)[1];
+                    displayMsg = displayMsg.replace(/^\{([a-zA-Z0-9#_, ]+):(.*?)\}/, '$2}');
+                } else if(displayMsg.substr(0, 1) === '}') {
+                    opened = '';
+                    displayMsg = displayMsg.substr(1);
+                }
+            }*/
+
+            //term.insert(formatColor(opened ? '{' + opened + ':' + displayMsg.substr(0, 1) + '}' : displayMsg.substr(0, 1)));
+            term.insert(displayMsg.substr(0, 1));
+            $('#cover').click();
+            displayMsg = displayMsg.substr(1);
+
+            if(!displayMsg.length) {
+                clearInterval(displayInt);
+                $('#cover').hide();
+
+                term.set_prompt(displayPrompt);
+                term.set_command('');
+                term.echo(formatColor(initMessage));
+
+                if(paused)
+                    term.pause();
+
+                onEnd();
+            }
+        }, 75 * normalSpeed);
+    } else {
+        term.echo(formatColor(message.replace(/\$([a-zA-Z0-9_]+)/g, function(match, v) {
+            return vars[v];
+        })));
+
+        if(onEnd)
+            onEnd();
+    }
 }
 
 function send(messages, instant) {
-    if(queue.length) {
+
+    if(Object.keys(queue).length) { // fix chrome bug
         queue       = queue.concat(messages);
         sendInstant = instant;
+
+        if(!sending && !activeTimeout)
+            treatSending();
+
         return ;
     }
 
     term.pause();
+    //queue       = queue.concat(messages); // queue = messages;
+    //sending     = true;
     queue = messages;
-    treatSending();
+    //console.log(Object.clone(messages));
+    //sendInstant = instant; ?? put it here or not ?
+    if(!sending && !activeTimeout) {
+        //scenarioIf = true;
+        treatSending();
+    }
 }
 
 function treatSending() {
-    while(typeof queue[0] === 'undefined')
-        queue.splice(0, 1); // fix chrome bug
+    sending = true;
+
+    /*while(typeof queue[0] === 'undefined')
+        queue.splice(0, 1); // fix chrome bug*/
 
     var keys = Object.keys(queue);
 
     if(!queue.length || !keys.length) {
-        saveGame();
+        /*ID = -1;
+        previous = -1;*/
+        //saveGame();
+        clearTimeout(sendTimeout); // just a precaution
+        sending       = false;
+        activeTimeout = false;
         return ;
     }
 
     var scheduleNext = true, place = keys[0], q = queue[place];
 
-    if(typeof q === 'string' && scenarioIf)
-        display(formatColor(q));
-    else {
+    //var a = Object.clone(q); if(Object.keys(q)[0] === '0') { var b = ''; for(var k in a) b += a[k]; a = b; }; console.debug(a);
+
+    if((typeof q === 'string' || q.type === 'text') && scenarioIf) {
+        if(!server.state('communicationOpened') || !vars.talking || q.type === 'text')
+            display(formatColor(q.type === 'text' ? q.content : q));
+        else {
+            display(formatColor(q), function() {
+                queue.splice(0, 1);
+
+                if(!Object.keys(queue).length) { // fix chrome bug
+                    term.resume();
+                    //saveGame();
+                } else
+                    treatSending();
+            });
+            sending = false;
+            return ;
+        }
+    } else {
         var keys = Object.keys(q);
 
-        if(keys.length === 1 && !q.type)
+        if(keys.length === 1 && !q.type) {
             q = {
                 type: keys[0],
                 content: q[keys[0]]
             };
+        }
 
-        if(q.type === 'file' && scenarioIf)
-            display('\nFichier : {f_cyan,italic:' + q.filename + '}\n\n=================================\n' + '{italic:' + q.content.split('\n').join('}\n{italic:') + '}\n=================================\n');
-        else if(q.type === 'incoming-communication' && scenarioIf)
+        //var a = Object.clone(q); if(Object.keys(q)[0] === '0') { var b = ''; for(var k in a) b += a[k]; a = b; }; console.debug(a);
+        //console.log(q);
+
+        if(q.type === '_commentary') {
+            // it's a commentary, so it does nothing
+        } else if(q.type === 'file' && scenarioIf) {
+            display('\nFichier : {f_cyan,italic:' + q.filename + '}\n\n=================================\n{italic:' + q.content.split('\n').join('}\n{italic:') + '}\n=================================\n');
+        } else if(q.type === 'download' && scenarioIf) {
+            var filename = q.file.split('/');
+            filename     = filename[filename.length - 1];
+            display('\nFichier : {f_cyan,italic:' +  filename  + '}\n\n=================================\n{italic:' + servers[q.from].readFile(q.file).split('\n').join('}\n{italic:') + '}\n=================================\n');
+        } else if(q.type === 'incoming-communication' && scenarioIf) {
             display('{f_darkgrey:=== Communication entrante ===}');
-        else if(q.type === 'taken' && scenarioIf)
+            vars.talking = 'Undefined';
+        } else if(q.type === 'taken' && scenarioIf) {
             display('{italic:' + q.name + ' est occuppé}');
-        else if(q.type === 'command' && scenarioIf)
+        } else if(q.type === 'command' && scenarioIf) {
             command(q.content, true);
+        } else if(q.type === 'talking' && scenarioIf)
+            vars.talking = q.content;
         else if(q.type === 'choice' && scenarioIf) {
             display('');
 
@@ -809,6 +977,7 @@ function treatSending() {
                 updatePrompt();
                 onBeforeCommand = null;
                 vars.choice     = cmd ;
+                activeTimeout   = true;
                 setTimeout(treatSending, 1);
                 return false;
             };
@@ -826,6 +995,7 @@ function treatSending() {
                 updatePrompt();
                 onBeforeCommand = null;
                 vars.input      = cmd ;
+                activeTimeout   = true;
                 setTimeout(treatSending, 1);
                 return false;
             };
@@ -833,25 +1003,56 @@ function treatSending() {
             scheduleNext = false;
             term.resume();
         } else if(q.type === 'js' && scenarioIf) {
-            try { typeof q.content === 'function' ? q.content() : new Function([], q.content)(); }
+            try {
+                /*if(q.content.match(/^(repeatH|h)istory(Next|)\(([0-9]*)\)(;|)$/)) {
+                    scheduleNext = false; // needed patch
+                    sending      = false;
+                }*/
+
+                typeof q.content === 'function' ? q.content() : new Function(['sending', 'scheduleNext'], q.content)(sending, scheduleNext);
+            }
             catch(e) {
                 display('{f_$red:Scenario JS command has crashed. Open developper\'s console for more details.}');
                 console.log(q, e);
+                console.log(e);
+                throw new Error('Scenario JS command has crashed');
+            }
+        } else if(q.type === 'js_file' && scenarioIf) {
+            try { new Function([], haskier.scenario[q.content])(); }
+            catch(e) {
+                display('{f_$red:Scenario JS file has crashed (' + q.content + '). Open developper\'s console for more details.}');
+                console.log(q, e);
+                console.log(e);
+                throw new Error('Scenario JS file has crashed (' + q.content + ')');
             }
         } else if(q.type === 'if') {
-            if(q.var)
-                scenarioIf = vars[q.var].toString() === q.mustBe.toString();
-            else if(q.server)
-                scenarioIf = new Server(servers[q.server]).readFile(q.file) === q.mustBe.toString();
+            if(q.var) {
+                if(typeof vars[q.var] !== 'undefined')
+                    scenarioIf = vars[q.var].toString() === q.mustBe.toString();
+                else
+                    throw new Error('Variable "' + q.var + '" is not defined !');
+            } else if(q.server)
+                scenarioIf = servers[q.server].readFile(q.file) === q.mustBe.toString();
         } else if(q.type === 'else') {
             scenarioIf = !scenarioIf;
         } else if(q.type === 'end') {
             scenarioIf = true;
+        } else if(q.type === 'set' && scenarioIf) {
+            if(q.var)
+                vars[q.var] = q.value;
+            else if(q.server)
+                vars.writedServer = !!servers[q.server].writeFile(q.file, q.value);
         } else if(q.type === 'game-over' && scenarioIf) {
-            display('{f_$red,bold:Vous avez échoué. }{f_$red,bold,italic:Game Over}');
-            queue        = [];
-            queue[place] = 0;
+            vars.gameOver = true;
+            display('{f_$red,bold:Vous avez échoué. }{f_$red,bold,italic:Game Over}. Tapez <{f_cyan:js r()}> pour recommencer une nouvelle partie.');
+            display('Toute action effectuée, hormis la réinitalisation de la partie, peut entraîner des bugs du jeu. Il est donc conseillé de réinitialiser votre sauvegarde dès maintenant.');
+            queue         = [];
             scheduleNext = false;
+            setTimeout(function() {
+                localStorage.setItem('haskier_before_gameover', localStorage.getItem('haskier'));
+                localStorage.removeItem('haskier');
+                window.location.reload();
+            }, 5000);
         } else if(q.type === 'end-of-game' && scenarioIf) {
             display('\n{f_cyan,italic:Vous avez terminé le jeu. Félicitations !}' + (version.substr(0, 2) === '0.' ? '\n{f_cyan,italic:Notez que ceci était une version Alpha du jeu et que le scénario n\'est, à ce titre, pas terminé.}' : '') + '\n{f_cyan,italic:Je vous remercie d\'avoir joué à ce jeu. N\'hésitez pas à le commenter sur mon compte twitter (@ClementNerma) afin que je puisse l\'améliorer. Merci !}');
         } else if(q.type !== 'wait' && scenarioIf) {
@@ -863,26 +1064,38 @@ function treatSending() {
     var old = q;
     queue.splice(place, 1);
 
-    if(!queue.length || !Object.keys(queue).length) { // fix chrome bug
-        sendInstant = false;
+    //console.log(old);
+
+    //if(!queue.length || !Object.keys(queue).length) { // fix chrome bug
+    if(!Object.keys(queue).length) { // fix chrome bug
+        clearTimeout(sendTimeout); // just a precaution
+        sendInstant   = false;
+        activeTimeout = false;
         term.resume();
-    } else if(scheduleNext)
-        setTimeout(function() {
+        //saveGame();
+    } else if(scheduleNext) {
+        //clearTimeout(sendTimeout);
+        activeTimeout = true;
+        sendTimeout   = setTimeout(function() {
             treatSending();
         }, (
             (!scenarioIf ? 0 :
-                (typeof old === 'string' || old.type === 'file') ?
-                500 + 50 * (old.length || old.content.length / 1.25) :
-                    (q.type === 'if' || q.type === 'else' || q.type === 'end' ? 0 :
-                        (old.wait || 50 * old.length || 3000)))) * (normalSpeed && (sendInstant ? 0 : 1)));
+                typeof old === 'string' || old.type === 'file' ?
+                        500 + 50 * (old.length || old.content.length / 1.25) :
+                            (q.type === 'if' || q.type === 'else' || q.type === 'end' ? 0 :
+                                (old.wait || 50 * old.length || 3000)))) * (normalSpeed && (sendInstant ? 0 : 1)));
+    }
+
+    sending = false;
 }
 
 function stopSending() {
-    queue = [];
+    queue   = [];
+    clearTimeout(sendTimeout);
 }
 
 function saveGame(afterPoint) {
-    if(historyPoint == Object.keys(progress)[0])
+    if(historyPoint == Object.keys(progress)[0] || !allowSaving)
         return ;
 
     if(afterPoint)
@@ -894,44 +1107,68 @@ function saveGame(afterPoint) {
         view         : term.export_view(),
         vars         : vars,
         version      : version,
-        servers      : servers,
+        game         : haskier,
         gameVersion  : game.version,
         chdir        : server.chdir(),
 
         didSomethingAfterSave: didSomethingAfterSave ? 1 : 0
     }));
+
 }
 
 function readHistory(point) {
-    if(progress[point])
-        return ;
+    /*if(progress[point])
+        return ;*/
+
+    clearTimeout(sendTimeout);
+    queue         = []   ;
+    activeTimeout = false;
+    scenarioIf    = true ;
 
     historyPoint    = point;
     saveGame(true);
-    progress[point] = true;
+
+    //progress[point] = true;
+
+    if(_history[point].autoBackup) {
+        localStorage.setItem('haskier_smb_' + _history[point].autoBackup, JSON.stringify({
+            date: Date.now(),
+            save: localStorage.getItem('haskier')
+        }));
+    }
 
     todo = _history[point].todo;
     //console.log(_history[point].actions);
-    send(_history[point].actions || []);
+    var a = Object.clone(_history[point].actions), arr = [], q = Object.keys(a);
+    for(var i = 0; i < q.length; i += 1)
+        arr.push(a[q[i]]);
+
+    send([{_commentary: 'Head command to solve Haskier\'s bug'}].concat(arr));
 }
 
-function historyNext() {
+function historyNext(n) {
     var k = Object.keys(_history);
     var i = k.indexOf(historyPoint);
 
-    readHistory(k[i + 1]);
+    readHistory(k[i + (n || 1)]);
+}
+
+function repeatHistory() {
+    readHistory(historyPoint);
 }
 
 var save = localStorage.getItem('haskier'), progress, vars = {
-    name: 'Shaun',
-    server: '__local',
-    haskier: '{f_cyan,italic:Haskier}',
+    name    : 'Shaun',
+    server  : '__local',
+    haskier : '{f_cyan,italic:Haskier}',
+    hypernet: '{f_#8066B3,bold,italic:HyperNet}',
 
-    green: '#00FF00',
-    blue : '#1E90FF',
-    red  : '#FE1B00'
+    green : '#00FF00',
+    blue  : '#1E90FF',
+    red   : '#FE1B00',
+    purple: '#8066B3'
 
-}, onBeforeCommand, servers = game.servers;
+}, onBeforeCommand, _servers = haskier.servers;
 
 if(save) {
     try {
@@ -948,9 +1185,13 @@ if(save) {
             save = {};
         } else {
             progress = save.progress;
-            states   = save.states  ;
+            //states   = save.states  ;
             vars     = save.vars    ;
-            servers  = save.servers ;
+            _servers = save.game.servers ;
+            //haskier  = save.game    ;
+            var ohaskier = haskier;
+            haskier.servers = save.game.servers;
+            haskier.servers.__store = ohaskier.servers.__store;
 
             term.import_view(save.view);
         }
@@ -970,10 +1211,18 @@ if(!progress) {
         progress[i] = false;
 }
 
-for(var i in servers)
-    servers[i].states = game.statesModel;
+if(!Object.keys(save).length) {
+    //console.log(servers);
+    for(var i in _servers)
+        _servers[i]['.sys']['.states'] = Object.clone(game.statesModel);
+}
 
-var server = new Server(servers[vars.server]);
+var servers = {};
+
+for(var i in _servers)
+    servers[i] = new Server(_servers[i]);
+
+var server = servers[vars.server];
 
 if(typeof save.chdir !== 'undefined')
     server.chdir(save.chdir);
@@ -991,3 +1240,5 @@ if(historyPoint === Object.keys(_history)[0] && !save.didSomethingAfterSave)
 
 if(!save.didSomethingAfterSave)
     readHistory(historyPoint);
+
+$('#cover').hide();

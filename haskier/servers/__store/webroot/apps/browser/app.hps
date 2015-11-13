@@ -1,0 +1,25 @@
+'use strict';
+module.legend    = 'Récupérer le contenu d\'une page web sur le réseau internet';
+module.arguments = [
+    {
+        name     : 'URL',
+        legend   : 'URL du fichier',
+        required : true
+    },
+    {
+        name     : 'server',
+        legend   : 'Adresse IP du serveur si vous souhaitez vous connecter à un serveur précis. Omettez alors le préfixe {f_grey:xxx://}'
+    }
+];
+module.core     = function(URL, IP) {
+    if(!server.hashypernet())
+        return 'Votre ordinateur n\'est pas connecté à hypernet.';
+
+    if(IP) {
+        // connect to a specific server
+        if(!servers.hasOwnProperty(IP) || !servers[IP].hashypernet())
+            return 'Ce serveur n\'existe pas ou n\'est pas connecté à hypernet.';
+    } else {
+        // use Internet DNS
+    }
+};
