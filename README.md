@@ -1,4 +1,6 @@
 
+## Ceci est la première version de Haskier, qui est restée en version Alpha. La nouvelle version d'Haskier est disponible [ici](https://github.com/ClementNerma/Haskier)
+
 # Haskier
 
 Haskier est un jeu dans lequel vous incarnez *Shaun*, un jeune étudiant de 17 ans très doué en sécurité informatique.
